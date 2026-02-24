@@ -3,8 +3,8 @@ package values_test
 import (
 	"testing"
 
-	dryerr "github.com/lansweeper/helm-dryer/internal/errors"
-	"github.com/lansweeper/helm-dryer/internal/values"
+	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
+	"github.com/lansweeper-oss/helm-dryer/internal/values"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

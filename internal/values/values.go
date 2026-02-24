@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
-	dryerr "github.com/lansweeper/helm-dryer/internal/errors"
+	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
 	"go.yaml.in/yaml/v3"
 )
 

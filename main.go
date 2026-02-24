@@ -3,7 +3,7 @@ package main
 
 import (
 	"github.com/alecthomas/kong"
-	cmd "github.com/lansweeper/helm-dryer/cmd/dryer"
+	cmd "github.com/lansweeper-oss/helm-dryer/cmd/dryer"
 )
 
 func main() {

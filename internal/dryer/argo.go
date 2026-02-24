@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/lansweeper/helm-dryer/internal/argo"
-	dryerr "github.com/lansweeper/helm-dryer/internal/errors"
-	"github.com/lansweeper/helm-dryer/internal/utils"
+	"github.com/lansweeper-oss/helm-dryer/internal/argo"
+	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
+	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 )
 
 func (in *Input) ReadEnvironment() error {

@@ -7,17 +7,25 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/lansweeper/helm-dryer/internal/cli"
-	"github.com/lansweeper/helm-dryer/internal/utils"
-	"github.com/lansweeper/helm-dryer/internal/values"
+	"github.com/lansweeper-oss/helm-dryer/internal/cli"
+	"github.com/lansweeper-oss/helm-dryer/internal/utils"
+	"github.com/lansweeper-oss/helm-dryer/internal/values"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/downloader"
 	"helm.sh/helm/v3/pkg/getter"
 	ociRegistry "helm.sh/helm/v3/pkg/registry"
+	"helm.sh/helm/v3/pkg/repo"
+)
+
+const (
+	ChartsFolder    = "charts"
+	LocalRepoPrefix = "file://"
 )
 
 // Client is a client for interacting with Helm charts.
@@ -89,8 +97,14 @@ func TemplateAndParseYaml(
 	return yamlData, nil
 }
 
-// DependenciesNeedUpdate checks if the dependencies of a Helm chart need to be updated.
-func (h *Client) DependenciesNeedUpdate() bool {
+// StaleDependencies returns which Helm chart dependencies need an update.
+func (h *Client) StaleDependencies() []*chart.Dependency {
+	if h.UpdateDependencies {
+		return h.Chart.Metadata.Dependencies
+	}
+
+	needUpdate := []*chart.Dependency{}
+
 	for _, dependency := range h.Chart.Metadata.Dependencies {
 		slog.Debug("Checking dependency: " + dependency.Name + " version: " + dependency.Version)
 
@@ -98,11 +112,11 @@ func (h *Client) DependenciesNeedUpdate() bool {
 		if !exists {
 			slog.Debug("Dependency not found, triggering an update")
 
-			return true
+			needUpdate = append(needUpdate, dependency)
 		}
 	}
 
-	return false
+	return needUpdate
 }
 
 // HasDependencies checks if the Helm chart has any dependencies defined in its Chart.yaml file.
@@ -147,13 +161,15 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 
 	h.deduplicateDependencies()
 
-	if h.UpdateDependencies || h.DependenciesNeedUpdate() {
-		err = h.UpdateDeps()
+	dependenciesToUpdate := h.StaleDependencies()
+
+	if len(dependenciesToUpdate) > 0 {
+		err = h.UpdateDeps(dependenciesToUpdate)
 		if err != nil {
 			return nil, fmt.Errorf("could not update dependencies: %w", err)
 		}
 
-		err = h.CacheDependencies()
+		err = h.CacheDependencies(dependenciesToUpdate)
 		if err != nil {
 			return nil, fmt.Errorf("could not store chart dependencies: %w", err)
 		}
@@ -172,7 +188,7 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 // It reads the values files from the dependencies and merges them into a single map where the
 // root keys are the names of the dependencies.
 func (h *Client) ReadDependenciesValues() (map[string]any, error) {
-	dir := filepath.Join(h.Path, "charts")
+	dir := filepath.Join(h.Path, ChartsFolder)
 	vals := map[string]any{}
 
 	for _, dependency := range h.Chart.Dependencies() {
@@ -207,68 +223,78 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 }
 
 // UpdateDeps updates the dependencies of a Helm chart located at the specified path.
-func (h *Client) UpdateDeps() error {
+func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
+	chartsDir := filepath.Join(h.Path, ChartsFolder)
+
+	downloader, err := h.chartDownloader()
+	if err != nil {
+		return fmt.Errorf("failed to create chart downloader: %w", err)
+	}
+
+	settings := helmCli.EnvSettings{
+		Debug:           h.Debug,
+		RepositoryCache: getCacheDir(),
+	}
+
+	for _, dep := range dependencies {
+		switch {
+		case strings.HasPrefix(dep.Repository, LocalRepoPrefix):
+			err = h.packageLocalDependency(dep, chartsDir)
+		case ociRegistry.IsOCI(dep.Repository):
+			ref := strings.TrimRight(dep.Repository, "/") + "/" + dep.Name
+			slog.Debug("Downloading OCI dependency", "ref", ref, "version", dep.Version)
+
+			_, _, err = downloader.DownloadTo(ref, dep.Version, chartsDir)
+		default:
+			var chartURL string
+
+			chartURL, err = repo.FindChartInRepoURL(
+				dep.Repository, dep.Name, dep.Version,
+				"", "", "",
+				getter.All(&settings),
+			)
+			if err != nil {
+				err = fmt.Errorf("failed to resolve chart URL for %s: %w", dep.Name, err)
+
+				break
+			}
+
+			slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
+
+			_, _, err = downloader.DownloadTo(chartURL, dep.Version, chartsDir)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to download dependency %s-%s: %w", dep.Name, dep.Version, err)
+		}
+
+		slog.Debug("Dependency downloaded", "name", dep.Name, "version", dep.Version)
+	}
+
+	return nil
+}
+
+// chartDownloader sets up the proper credentials and cache settings.
+func (h *Client) chartDownloader() (*downloader.ChartDownloader, error) {
 	cacheDir := getCacheDir()
-	slog.Debug(fmt.Sprintf("Updating dependencies from: %s (cache: %s)", h.Path, cacheDir))
+
 	settings := helmCli.EnvSettings{
 		Debug:           h.Debug,
 		RepositoryCache: cacheDir,
 	}
-	// We need to override this since Helm internals do not honor the getter settings :(
-	err := os.Setenv(Cache, cacheDir)
+
+	registryClient, err := h.registryClient()
 	if err != nil {
-		return fmt.Errorf("failed to set environment variable %s: %w", Cache, err)
+		return nil, fmt.Errorf("failed to create registry client: %w", err)
 	}
 
-	clientOpts := []ociRegistry.ClientOption{
-		ociRegistry.ClientOptDebug(h.Debug),
-		ociRegistry.ClientOptEnableCache(true),
-	}
-
-	var opt ociRegistry.LoginOption
-
-	if h.Credentials != nil {
-		if h.Credentials.Username != "" && h.Credentials.Password != "" && h.Credentials.Registry != "" {
-			slog.Debug("Using basic auth for OCI registry in " + h.Credentials.Registry)
-
-			opt = ociRegistry.LoginOptBasicAuth(h.Credentials.Username, h.Credentials.Password)
-		} else if h.Credentials.File != "" {
-			slog.Debug("Using credentials file for OCI registry")
-
-			clientOpts = append(clientOpts, ociRegistry.ClientOptCredentialsFile(h.Credentials.File))
-		}
-	}
-
-	registryClient, err := ociRegistry.NewClient(clientOpts...)
-	if err != nil {
-		return fmt.Errorf("failed to create OCI registry client: %w", err)
-	}
-
-	if opt != nil {
-		err = registryClient.Login(h.Credentials.Registry, opt)
-		if err != nil {
-			return fmt.Errorf("failed to login to OCI registry: %w", err)
-		}
-	}
-
-	manager := &downloader.Manager{
-		ChartPath:       h.Path,
-		Getters:         getter.All(&settings),
+	return &downloader.ChartDownloader{
 		Out:             os.Stderr,
-		RegistryClient:  registryClient,
-		RepositoryCache: cacheDir,
-		SkipUpdate:      false,
 		Verify:          downloader.VerifyNever,
-	}
-
-	err = manager.Update()
-	if err != nil {
-		return fmt.Errorf("failed to update dependencies: %w", err)
-	}
-
-	slog.Debug("Dependencies updated")
-
-	return nil
+		RepositoryCache: cacheDir,
+		RegistryClient:  registryClient,
+		Getters:         getter.All(&settings),
+	}, nil
 }
 
 // deduplicateDependencies remove duplicates from the dependencies list.
@@ -290,4 +316,64 @@ func (h *Client) deduplicateDependencies() {
 	}
 
 	h.Chart.Metadata.Dependencies = dependencies
+}
+
+// packageLocalDependency packages a local dependency into the charts directory.
+func (h *Client) packageLocalDependency(dep *chart.Dependency, destDir string) error {
+	localPath := strings.TrimPrefix(dep.Repository, LocalRepoPrefix)
+	if !filepath.IsAbs(localPath) {
+		localPath = filepath.Join(h.Path, localPath)
+	}
+
+	localPath = filepath.Clean(localPath)
+
+	slog.Debug("Packaging local dependency", "path", localPath)
+
+	localChart, err := loader.LoadDir(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to load local chart from %s: %w", localPath, err)
+	}
+
+	_, err = chartutil.Save(localChart, destDir)
+	if err != nil {
+		return fmt.Errorf("failed to package local chart %s: %w", dep.Name, err)
+	}
+
+	return nil
+}
+
+// registryClient creates and authenticates an OCI registry client using the configured credentials.
+func (h *Client) registryClient() (*ociRegistry.Client, error) {
+	clientOpts := []ociRegistry.ClientOption{
+		ociRegistry.ClientOptDebug(h.Debug),
+		ociRegistry.ClientOptEnableCache(true),
+	}
+
+	var opt ociRegistry.LoginOption
+
+	if h.Credentials != nil {
+		if h.Credentials.Username != "" && h.Credentials.Password != "" && h.Credentials.Registry != "" {
+			slog.Debug("Using basic auth for OCI registry in " + h.Credentials.Registry)
+
+			opt = ociRegistry.LoginOptBasicAuth(h.Credentials.Username, h.Credentials.Password)
+		} else if h.Credentials.File != "" {
+			slog.Debug("Using credentials file for OCI registry")
+
+			clientOpts = append(clientOpts, ociRegistry.ClientOptCredentialsFile(h.Credentials.File))
+		}
+	}
+
+	registryClient, err := ociRegistry.NewClient(clientOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI registry client: %w", err)
+	}
+
+	if opt != nil {
+		err = registryClient.Login(h.Credentials.Registry, opt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to login to OCI registry: %w", err)
+		}
+	}
+
+	return registryClient, nil
 }

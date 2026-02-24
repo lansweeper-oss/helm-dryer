@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"strings"
 
-	client "github.com/lansweeper/helm-dryer/internal/helm"
-	"github.com/lansweeper/helm-dryer/internal/utils"
+	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
+	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"

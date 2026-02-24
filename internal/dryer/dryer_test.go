@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lansweeper/helm-dryer/internal/dryer"
-	client "github.com/lansweeper/helm-dryer/internal/helm"
-	"github.com/lansweeper/helm-dryer/internal/utils"
+	"github.com/lansweeper-oss/helm-dryer/internal/dryer"
+	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
+	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"

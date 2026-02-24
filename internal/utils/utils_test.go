@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansweeper/helm-dryer/internal/utils"
+	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -341,7 +341,7 @@ func TestIsDir(t *testing.T) {
 				t.Helper()
 				dir := t.TempDir()
 				file := filepath.Join(dir, "testfile.txt")
-				err := os.WriteFile(file, []byte("test content"), 0o644)
+				err := os.WriteFile(file, []byte("test content"), utils.ReadWrite)
 				require.NoError(t, err)
 
 				return file
@@ -361,7 +361,7 @@ func TestIsDir(t *testing.T) {
 				t.Helper()
 				dir := t.TempDir()
 				nestedDir := filepath.Join(dir, "nested", "deep")
-				err := os.MkdirAll(nestedDir, 0o755)
+				err := os.MkdirAll(nestedDir, utils.ReadWriteDir)
 				require.NoError(t, err)
 
 				return nestedDir
@@ -471,7 +471,7 @@ func TestCopyFile(t *testing.T) {
 		dstFile := filepath.Join(dstDir, "dest.txt")
 
 		content := []byte("hello world")
-		err := os.WriteFile(srcFile, content, 0o644)
+		err := os.WriteFile(srcFile, content, utils.ReadWrite)
 		require.NoError(t, err)
 
 		err = utils.CopyFile(srcFile, dstFile)
@@ -496,7 +496,7 @@ func TestCopyFile(t *testing.T) {
 		t.Parallel()
 
 		srcFile := filepath.Join(t.TempDir(), "source.txt")
-		err := os.WriteFile(srcFile, []byte("data"), 0o644)
+		err := os.WriteFile(srcFile, []byte("data"), utils.ReadWrite)
 		require.NoError(t, err)
 
 		err = utils.CopyFile(srcFile, "/nonexistent/dir/dest.txt")
@@ -513,7 +513,7 @@ func TestEnsureDirExists(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "newdir")
 
-		err := utils.EnsureDirExists(dir, utils.ReadWrite)
+		err := utils.EnsureDirExists(dir, utils.ReadWriteDir)
 		require.NoError(t, err)
 
 		info, err := os.Stat(dir)
@@ -526,7 +526,7 @@ func TestEnsureDirExists(t *testing.T) {
 
 		dir := t.TempDir()
 
-		err := utils.EnsureDirExists(dir, utils.ReadWrite)
+		err := utils.EnsureDirExists(dir, utils.ReadWriteDir)
 		require.NoError(t, err)
 	})
 
@@ -535,7 +535,7 @@ func TestEnsureDirExists(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "a", "b", "c")
 
-		err := utils.EnsureDirExists(dir, utils.ReadWrite)
+		err := utils.EnsureDirExists(dir, utils.ReadWriteDir)
 		require.NoError(t, err)
 
 		info, err := os.Stat(dir)
