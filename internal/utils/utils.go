@@ -32,6 +32,30 @@ func init() {
 	templateFuncs = sprig.FuncMap()
 	delete(templateFuncs, "env")
 	delete(templateFuncs, "expandenv")
+	templateFuncs["toYaml"] = toYAML
+	templateFuncs["fromYaml"] = fromYAML
+}
+
+// fromYAML converts a YAML string into a map[string]any.
+func fromYAML(str string) map[string]any {
+	result := map[string]any{}
+
+	err := yaml.Unmarshal([]byte(str), &result)
+	if err != nil {
+		result["Error"] = err.Error()
+	}
+
+	return result
+}
+
+// toYAML marshals a value to YAML and returns it as a string.
+func toYAML(val any) string {
+	data, err := yaml.Marshal(val)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSuffix(string(data), "\n")
 }
 
 // CopyFile copies a file from the source path to the destination path.

@@ -683,3 +683,76 @@ func TestToBoolean(t *testing.T) {
 	assert.False(t, utils.ToBoolean(""), "ToBoolean should return false for an empty string")
 	assert.False(t, utils.ToBoolean("random"), "ToBoolean should return false for 'random'")
 }
+
+func TestToYaml(t *testing.T) {
+	t.Parallel()
+
+	tpl := utils.GetTemplate("missingkey=zero", "{{", "}}")
+
+	t.Run("map", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl, err := tpl.Clone()
+		require.NoError(t, err)
+		tmpl, err = tmpl.Parse(`{{ .data | toYaml }}`)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		err = tmpl.Execute(&buf, map[string]any{"data": map[string]any{"key": "value", "num": 42}})
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "key: value")
+		assert.Contains(t, buf.String(), "num: 42")
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl, err := tpl.Clone()
+		require.NoError(t, err)
+		tmpl, err = tmpl.Parse(`{{ .data | toYaml }}`)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		err = tmpl.Execute(&buf, map[string]any{"data": nil})
+		require.NoError(t, err)
+		assert.Equal(t, "null", buf.String())
+	})
+}
+
+func TestFromYaml(t *testing.T) {
+	t.Parallel()
+
+	tpl := utils.GetTemplate("missingkey=zero", "{{", "}}")
+
+	t.Run("valid", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl, err := tpl.Clone()
+		require.NoError(t, err)
+		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.name }}`)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		err = tmpl.Execute(&buf, map[string]any{"input": "name: test\nversion: 1"})
+		require.NoError(t, err)
+		assert.Equal(t, "test", buf.String())
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl, err := tpl.Clone()
+		require.NoError(t, err)
+		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.Error }}`)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		err = tmpl.Execute(&buf, map[string]any{"input": ": invalid: yaml: ["})
+		require.NoError(t, err)
+		assert.NotEmpty(t, buf.String(), "should contain error message")
+	})
+}
