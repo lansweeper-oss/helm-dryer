@@ -1,0 +1,17 @@
+admins: [] # default
+foo-bar:
+  serviceAccount:
+    name: "{{ .Release.Name }}"
+  secondPassTest: {{ dig "foo-bar" "serviceMonitor" "enabled" "" (merge dict .Values) }}
+dependencyTest: {{ dig "foo-bar" "replicaCount" 0 .Values }}
+hello-world:
+  fullnameOverride: foo-{{ .Release.Name }}
+  serviceAccount:
+    name: sa-{{ .Release.Name }}
+{{- with .Values.admins }}
+roles:
+{{- range . }}
+  - name: {{ . }}
+    role: admin
+{{- end }}
+{{- end }}

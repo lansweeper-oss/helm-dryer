@@ -1,0 +1,6 @@
+tags:
+  foobar: false
+  hello: false
+monitoring:
+  service:
+    name: ~

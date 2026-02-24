@@ -1,0 +1,46 @@
+# Default values for foo-bar.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 2
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+annotations: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+config:
+  foo: bar
+  bar: baz
+  quz: qux
+
+serviceMonitor:
+  enabled: true
+
+clusterName: ""
+logLevel: info
+nodeSelector: {}
+tolerations: []
+controllerConfig:
+  featureGates: {}
+enableCertManager: false
+metricsBindAddress: ""

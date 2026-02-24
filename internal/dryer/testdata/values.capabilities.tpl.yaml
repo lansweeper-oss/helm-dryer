@@ -1,0 +1,10 @@
+foo:
+  bar:
+  {{- range .Capabilities.APIVersions }}
+  - {{ . }}
+  {{- end }}
+  {{- with (dig "KubeVersion" "Minor" "" .Capabilities) }}
+  minorVersion: {{ . }}
+  {{- end }}
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}

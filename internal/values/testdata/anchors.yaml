@@ -1,0 +1,8 @@
+foo: &foo
+  a: &a a
+  b: &b b
+
+bar: &bar # this anchor triggers a failure with goccy/go-yaml, see https://github.com/goccy/go-yaml/issues/787
+  <<: *foo
+  c:
+    - *b

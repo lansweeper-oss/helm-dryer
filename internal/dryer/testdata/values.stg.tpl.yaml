@@ -1,0 +1,8 @@
+admins:
+  - platform
+foo-bar:
+  clusterName: {{ .Values.clusterName }}
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: >-
+        arn:{{ .Values.partition }}:iam::{{ .Values.accountId }}:role/eks/{{ .Values.namePrefixWithoutDomain }}-foo_bar

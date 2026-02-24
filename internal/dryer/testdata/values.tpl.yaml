@@ -1,0 +1,27 @@
+{{- $workerGroup := "system" }}
+foo-bar:
+  clusterName: ~
+  controllerConfig:
+    featureGates:
+      SubnetsClusterTagCheck: false
+  enableCertManager: true
+  logLevel: info
+  metricsBindAddress: 127.0.0.1:8080
+  nodeSelector:
+    worker-group: {{ $workerGroup }}
+  serviceAccount:
+    name: {{ .Release.Name }}
+  tolerations:
+    - effect: NoSchedule
+      key: dedicated
+      operator: Equal
+      value: {{ $workerGroup }}
+  serviceMonitor:
+    enabled: true
+hello-world:
+  fullnameOverride: foo-{{ .Release.Name }}
+  serviceAccount:
+    name: sa-{{ .Release.Name }}
+monitoring:
+  service:
+    name: ~

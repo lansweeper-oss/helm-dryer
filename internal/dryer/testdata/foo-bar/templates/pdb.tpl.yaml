@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+{{- with .Values.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+{{- end }}
+  name: {{ include "foo-bar.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "foo-bar.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "foo-bar.selectorLabels" . | nindent 6 }}
