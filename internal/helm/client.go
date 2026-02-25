@@ -41,7 +41,6 @@ type Client struct {
 type Options struct {
 	DelimLeft       string
 	DelimRight      string
-	PassPending     bool
 	TemplateOptions string
 }
 
