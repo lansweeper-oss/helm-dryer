@@ -505,6 +505,49 @@ func TestCopyFile(t *testing.T) {
 	})
 }
 
+func TestDeepCopyWithSlices(t *testing.T) {
+	t.Parallel()
+
+	t.Run("copies []any slices deeply", func(t *testing.T) {
+		t.Parallel()
+
+		original := map[string]any{
+			"list": []any{"a", "b", map[string]any{"nested": "value"}},
+		}
+
+		result, err := utils.DeepCopy(original)
+		require.NoError(t, err)
+		assert.Equal(t, original, result)
+
+		// Verify the slice is a different instance
+		origSlice := original["list"].([]any)
+		copySlice := result["list"].([]any)
+		origSlice[0] = "modified"
+
+		assert.Equal(t, "a", copySlice[0], "Modifying original slice should not affect copy")
+	})
+
+	t.Run("copies nested maps inside slices", func(t *testing.T) {
+		t.Parallel()
+
+		original := map[string]any{
+			"items": []any{
+				map[string]any{"key": "value1"},
+				map[string]any{"key": "value2"},
+			},
+		}
+
+		result, err := utils.DeepCopy(original)
+		require.NoError(t, err)
+
+		// Modify nested map in original
+		original["items"].([]any)[0].(map[string]any)["key"] = "modified"
+
+		assert.Equal(t, "value1", result["items"].([]any)[0].(map[string]any)["key"],
+			"Modifying nested map in original slice should not affect copy")
+	})
+}
+
 func TestEnsureDirExists(t *testing.T) {
 	t.Parallel()
 
@@ -541,6 +584,42 @@ func TestEnsureDirExists(t *testing.T) {
 		info, err := os.Stat(dir)
 		require.NoError(t, err)
 		assert.True(t, info.IsDir())
+	})
+}
+
+func TestFromYaml(t *testing.T) {
+	t.Parallel()
+
+	tpl := utils.GetTemplate("missingkey=zero", "{{", "}}")
+
+	t.Run("valid", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl, err := tpl.Clone()
+		require.NoError(t, err)
+		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.name }}`)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		err = tmpl.Execute(&buf, map[string]any{"input": "name: test\nversion: 1"})
+		require.NoError(t, err)
+		assert.Equal(t, "test", buf.String())
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		t.Parallel()
+
+		tmpl, err := tpl.Clone()
+		require.NoError(t, err)
+		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.Error }}`)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		err = tmpl.Execute(&buf, map[string]any{"input": ": invalid: yaml: ["})
+		require.NoError(t, err)
+		assert.NotEmpty(t, buf.String(), "should contain error message")
 	})
 }
 
@@ -585,87 +664,6 @@ func TestGetTemplate(t *testing.T) {
 		err = parsed.Execute(&buf, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "HELLO", buf.String())
-	})
-}
-
-func TestWriteOutput(t *testing.T) {
-	t.Parallel()
-	t.Run("writes to file", func(t *testing.T) {
-		t.Parallel()
-		outFile := filepath.Join(t.TempDir(), "output.txt")
-		data := []byte("output content")
-
-		err := utils.WriteOutput(data, outFile)
-		require.NoError(t, err)
-
-		result, err := os.ReadFile(outFile)
-		require.NoError(t, err)
-		assert.Equal(t, data, result)
-	})
-
-	t.Run("returns error for invalid file path", func(t *testing.T) {
-		t.Parallel()
-
-		err := utils.WriteOutput([]byte("data"), "/nonexistent/dir/file.txt")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "error writing output to file")
-	})
-
-	t.Run("writes to stdout when path is empty", func(t *testing.T) {
-		t.Parallel()
-
-		err := utils.WriteOutput([]byte("stdout data"), "")
-		require.NoError(t, err)
-	})
-
-	t.Run("writes to stdout when path is dash", func(t *testing.T) {
-		t.Parallel()
-
-		err := utils.WriteOutput([]byte("stdout data"), "-")
-		require.NoError(t, err)
-	})
-}
-
-func TestDeepCopyWithSlices(t *testing.T) {
-	t.Parallel()
-
-	t.Run("copies []any slices deeply", func(t *testing.T) {
-		t.Parallel()
-
-		original := map[string]any{
-			"list": []any{"a", "b", map[string]any{"nested": "value"}},
-		}
-
-		result, err := utils.DeepCopy(original)
-		require.NoError(t, err)
-		assert.Equal(t, original, result)
-
-		// Verify the slice is a different instance
-		origSlice := original["list"].([]any)
-		copySlice := result["list"].([]any)
-		origSlice[0] = "modified"
-
-		assert.Equal(t, "a", copySlice[0], "Modifying original slice should not affect copy")
-	})
-
-	t.Run("copies nested maps inside slices", func(t *testing.T) {
-		t.Parallel()
-
-		original := map[string]any{
-			"items": []any{
-				map[string]any{"key": "value1"},
-				map[string]any{"key": "value2"},
-			},
-		}
-
-		result, err := utils.DeepCopy(original)
-		require.NoError(t, err)
-
-		// Modify nested map in original
-		original["items"].([]any)[0].(map[string]any)["key"] = "modified"
-
-		assert.Equal(t, "value1", result["items"].([]any)[0].(map[string]any)["key"],
-			"Modifying nested map in original slice should not affect copy")
 	})
 }
 
@@ -721,38 +719,40 @@ func TestToYaml(t *testing.T) {
 	})
 }
 
-func TestFromYaml(t *testing.T) {
+func TestWriteOutput(t *testing.T) {
 	t.Parallel()
-
-	tpl := utils.GetTemplate("missingkey=zero", "{{", "}}")
-
-	t.Run("valid", func(t *testing.T) {
+	t.Run("writes to file", func(t *testing.T) {
 		t.Parallel()
+		outFile := filepath.Join(t.TempDir(), "output.txt")
+		data := []byte("output content")
 
-		tmpl, err := tpl.Clone()
-		require.NoError(t, err)
-		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.name }}`)
+		err := utils.WriteOutput(data, outFile)
 		require.NoError(t, err)
 
-		var buf bytes.Buffer
-
-		err = tmpl.Execute(&buf, map[string]any{"input": "name: test\nversion: 1"})
+		result, err := os.ReadFile(outFile)
 		require.NoError(t, err)
-		assert.Equal(t, "test", buf.String())
+		assert.Equal(t, data, result)
 	})
 
-	t.Run("invalid", func(t *testing.T) {
+	t.Run("returns error for invalid file path", func(t *testing.T) {
 		t.Parallel()
 
-		tmpl, err := tpl.Clone()
-		require.NoError(t, err)
-		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.Error }}`)
-		require.NoError(t, err)
+		err := utils.WriteOutput([]byte("data"), "/nonexistent/dir/file.txt")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error writing output to file")
+	})
 
-		var buf bytes.Buffer
+	t.Run("writes to stdout when path is empty", func(t *testing.T) {
+		t.Parallel()
 
-		err = tmpl.Execute(&buf, map[string]any{"input": ": invalid: yaml: ["})
+		err := utils.WriteOutput([]byte("stdout data"), "")
 		require.NoError(t, err)
-		assert.NotEmpty(t, buf.String(), "should contain error message")
+	})
+
+	t.Run("writes to stdout when path is dash", func(t *testing.T) {
+		t.Parallel()
+
+		err := utils.WriteOutput([]byte("stdout data"), "-")
+		require.NoError(t, err)
 	})
 }

@@ -651,6 +651,16 @@ admins:
   - a-team
 ```
 
+### Logging
+
+ArgoCD captures CMP `stderr` only when the plugin exits with a non-zero code (error).
+
+On success, `stderr` is discarded by the CMP sidecar. This is ArgoCD's behavior, not Dryer's:
+the CMP protocol streams `stdout` as the manifest output and throws away `stderr` on success.
+
+For this reason, even when `--debug` is set nothing is shown in the container logs.
+You'd only see them if an application fails to render, or if you use `Dryer` as a CLI.
+
 ## ArgoCD integration
 
 As with any other Configuration Management Plugin, `dryer` runs as a sidecar container of
