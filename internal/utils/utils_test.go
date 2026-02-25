@@ -548,45 +548,6 @@ func TestDeepCopyWithSlices(t *testing.T) {
 	})
 }
 
-func TestEnsureDirExists(t *testing.T) {
-	t.Parallel()
-
-	t.Run("creates directory when it does not exist", func(t *testing.T) {
-		t.Parallel()
-
-		dir := filepath.Join(t.TempDir(), "newdir")
-
-		err := utils.EnsureDirExists(dir, utils.ReadWriteDir)
-		require.NoError(t, err)
-
-		info, err := os.Stat(dir)
-		require.NoError(t, err)
-		assert.True(t, info.IsDir())
-	})
-
-	t.Run("succeeds when directory already exists", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-
-		err := utils.EnsureDirExists(dir, utils.ReadWriteDir)
-		require.NoError(t, err)
-	})
-
-	t.Run("creates nested directories", func(t *testing.T) {
-		t.Parallel()
-
-		dir := filepath.Join(t.TempDir(), "a", "b", "c")
-
-		err := utils.EnsureDirExists(dir, utils.ReadWriteDir)
-		require.NoError(t, err)
-
-		info, err := os.Stat(dir)
-		require.NoError(t, err)
-		assert.True(t, info.IsDir())
-	})
-}
-
 func TestFromYaml(t *testing.T) {
 	t.Parallel()
 

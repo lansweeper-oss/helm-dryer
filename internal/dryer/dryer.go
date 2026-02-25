@@ -93,6 +93,10 @@ func (in *Input) TemplateValues() error {
 			UpdateDependencies: in.Settings.UpdateDependencies,
 		}
 
+		if err != nil {
+			slog.Warn("Unexpected error checking Chart.yaml", "path", chartFilePath, "error", err)
+		}
+
 		vals, err = helmClient.ReadChartDependencies()
 		if err != nil {
 			return fmt.Errorf("failed to read chart dependencies: %w", err)
@@ -181,6 +185,8 @@ func (in *Input) processValuesFiles(
 			}
 
 			return nil, fmt.Errorf("%w: %s", os.ErrNotExist, file)
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to stat values file %s: %w", file, err)
 		}
 
 		slog.Debug("Reading values file: " + fileWithPath)

@@ -20,17 +20,17 @@ func EnsureCacheDirs(path string) error {
 	cacheDir := getCacheDir()
 	chartsCacheDir := getChartsCacheDir()
 
-	err := utils.EnsureDirExists(chartDependenciesDir, utils.ReadWriteDir)
+	err := os.MkdirAll(chartDependenciesDir, utils.ReadWriteDir)
 	if err != nil {
 		return fmt.Errorf("failed to ensure chart dependencies directory %s exists: %w", chartDependenciesDir, err)
 	}
 
-	err = utils.EnsureDirExists(cacheDir, utils.ReadWriteDir)
+	err = os.MkdirAll(cacheDir, utils.ReadWriteDir)
 	if err != nil {
 		return fmt.Errorf("failed to ensure cache directory %s exists: %w", cacheDir, err)
 	}
 
-	err = utils.EnsureDirExists(chartsCacheDir, utils.ReadWriteDir)
+	err = os.MkdirAll(chartsCacheDir, utils.ReadWriteDir)
 	if err != nil {
 		return fmt.Errorf("failed to ensure charts cache directory %s exists: %w", chartsCacheDir, err)
 	}

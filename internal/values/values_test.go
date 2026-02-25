@@ -72,9 +72,12 @@ func TestMergeYAMLArrayOfMaps(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, _ := values.MergeYAMLArrayOfMaps(test.input)
+			result, err := values.MergeYAMLArrayOfMaps(test.input)
 
-			if !test.hasError {
+			if test.hasError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 				assert.Equal(t, test.expected, result)
 			}
 		})
@@ -139,9 +142,12 @@ func TestReadValuesFile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, _ := values.ReadFile(test.filePath)
+			result, err := values.ReadFile(test.filePath)
 
-			if !test.hasError {
+			if test.hasError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 				assert.Equal(t, test.expected, result)
 			}
 		})
@@ -221,9 +227,12 @@ func TestMergeYamlMaps(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			_ = values.MergeYamlMaps(test.m1, test.m2)
+			err := values.MergeYamlMaps(test.m1, test.m2)
 
-			if !test.hasError {
+			if test.hasError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 				assert.Equal(t, test.expected, test.m1)
 			}
 		})
@@ -369,9 +378,12 @@ func TestFromCli(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, _ := values.DotNotationToMap(test.input)
+			result, err := values.DotNotationToMap(test.input)
 
-			if !test.hasError {
+			if test.hasError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 				assert.Equal(t, test.expected, result)
 			}
 		})

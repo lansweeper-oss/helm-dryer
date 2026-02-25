@@ -69,12 +69,12 @@ func (in *Input) TemplateChart() error {
 func (in *Input) renderChart(vals map[string]any) error {
 	folderOutput := in.UsingFolderAsOutput()
 
-	loader, err := loader.Loader(in.Settings.Path)
+	chartLoader, err := loader.Loader(in.Settings.Path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chart loader: %w", err)
 	}
 
-	chart, err := loader.Load()
+	chart, err := chartLoader.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load Chart: %w", err)
 	}
@@ -200,7 +200,6 @@ func (in *Input) templateYAMLFile(
 
 	templateOptions := client.Options{
 		DelimLeft:       in.Settings.DelimLeft,
-		PassPending:     in.Settings.TwoPass,
 		DelimRight:      in.Settings.DelimRight,
 		TemplateOptions: option,
 	}

@@ -49,13 +49,15 @@ func fromYAML(str string) map[string]any {
 }
 
 // toYAML marshals a value to YAML and returns it as a string.
-func toYAML(val any) string {
+// Unlike Helm's implementation which silently returns "", this returns an error
+// so that text/template propagates marshaling failures through Execute.
+func toYAML(val any) (string, error) {
 	data, err := yaml.Marshal(val)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("failed to marshal value to YAML: %w", err)
 	}
 
-	return strings.TrimSuffix(string(data), "\n")
+	return strings.TrimSuffix(string(data), "\n"), nil
 }
 
 // CopyFile copies a file from the source path to the destination path.
@@ -121,21 +123,6 @@ func innerDeepCopy(value any) (any, error) {
 	}
 }
 
-// EnsureDirExists checks if a directory exists, and if not, creates it with the specified permissions.
-func EnsureDirExists(dir string, folderPermissions os.FileMode) error {
-	_, err := os.Stat(dir)
-	if err != nil {
-		slog.Debug("Creating folder: " + dir)
-
-		err := os.MkdirAll(dir, folderPermissions)
-		if err != nil {
-			return fmt.Errorf("failed to create cache directory: %w", err)
-		}
-	}
-
-	return nil
-}
-
 // GetEnv retrieves the value of an environment variable.
 // If the variable is not set, it returns the provided fallback value.
 func GetEnv(key, fallback string) string {
@@ -164,8 +151,14 @@ func GetTemplate(options, left, right string) *template.Template {
 // Files modified before this cutoff are considered expired.
 // If the TTL string is invalid, return a zero time indicating that caching is disabled.
 func GetTTL(ttl string) time.Time {
+	if ttl == "" {
+		return time.Time{}
+	}
+
 	duration, err := time.ParseDuration(ttl)
 	if err != nil {
+		slog.Warn("Invalid TTL format, caching disabled", "ttl", ttl, "error", err)
+
 		return time.Time{}
 	}
 
