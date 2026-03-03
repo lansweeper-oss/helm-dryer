@@ -258,7 +258,7 @@ supported:
 - `releaseNamespace` - Override the release namespace, otherwise environment variable
   `ARGOCD_APP_NAMESPACE` or Application's `spec.destination.namespace` (in that order of precedence)
   is used.
-- `ttl` - Per-app control of the chart dependency archives TTL
+- `ttl` - Per-app control of the chart dependency archives TTL.
 - `twoPass` - Experimental (see below) feature to do a 2-pass render of the values.
 
 These settings can be customized per-application and override the global (CLI argument) ones.
