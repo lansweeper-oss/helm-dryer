@@ -86,7 +86,7 @@ jobs:
       run: |
         if [ -n "$(git status --porcelain README.md)" ]; then
           gh api graphql \
-          -F $githubRepository=${{ github.repository }} \
+          -F githubRepository=${{ github.repository }} \
           -F branchName=${{ github.base_ref }} \
           -F expectedHeadOid=$(git rev-parse HEAD) \
           -F commitMessage="chore: update README.md" \
