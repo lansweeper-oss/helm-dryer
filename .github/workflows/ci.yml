@@ -83,22 +83,13 @@ jobs:
     - name: Commit if changes
       run: |
         if [ -n "$(git status --porcelain README.md)" ]; then
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add README.md
-          git commit -m "chore: update README.md"
-          for i in 1 2 3; do
-            git pull origin "${{ github.head_ref }}" --rebase
-            if git push origin HEAD:"${{ github.head_ref }}"; then
-              break
-            elif [ "$i" -eq 3 ]; then
-              echo "❌ Failed to push after 3 attempts due to concurrent updates."
-              exit 1
-            else
-              echo "Push failed, retrying ($i/3)..."
-              sleep 2
-            fi
-          done
+          gh api graphql \
+          -F $githubRepository=$GITHUB_REPOSITORY \
+          -F branchName=${{ github.base_ref }} \
+          -F expectedHeadOid=$(git rev-parse HEAD) \
+          -F commitMessage="chore: update README.md" \
+          -F files[][path]="README.md" -F files[][contents]=$(base64 -w0 README.md) \
+          -F 'query=@.github/api/createCommitOnBranch.gql'
         fi
 
   test:
@@ -137,20 +128,11 @@ jobs:
     - name: Commit if changes
       run: |
         if ! git diff --exit-code coverage.svg > /dev/null; then
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add coverage.svg
-          git commit -m "chore: update coverage banner"
-          for i in 1 2 3; do
-            git pull origin "${{ github.head_ref }}" --rebase
-            if git push origin HEAD:"${{ github.head_ref }}"; then
-              break
-            elif [ "$i" -eq 3 ]; then
-              echo "❌ Failed to push after 3 attempts due to concurrent updates."
-              exit 1
-            else
-              echo "Push failed, retrying ($i/3)..."
-              sleep 2
-            fi
-          done
+          gh api graphql \
+          -F $githubRepository=$GITHUB_REPOSITORY \
+          -F branchName=${{ github.base_ref }} \
+          -F expectedHeadOid=$(git rev-parse HEAD) \
+          -F commitMessage="chore: update coverage banner" \
+          -F files[][path]="coverage.svg" -F files[][contents]=$(base64 -w0 coverage.svg) \
+          -F 'query=@.github/api/createCommitOnBranch.gql'
         fi
