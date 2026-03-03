@@ -87,7 +87,7 @@ jobs:
         if [ -n "$(git status --porcelain README.md)" ]; then
           gh api graphql \
           -F githubRepository=${{ github.repository }} \
-          -F branchName=${{ github.base_ref }} \
+          -F branchName=${{ github.head_ref }} \
           -F expectedHeadOid=$(git rev-parse HEAD) \
           -F commitMessage="chore: update README.md" \
           -F files[][path]="README.md" -F files[][contents]=$(base64 -w0 README.md) \
@@ -133,8 +133,8 @@ jobs:
       run: |
         if ! git diff --exit-code coverage.svg > /dev/null; then
           gh api graphql \
-          -F $githubRepository=$GITHUB_REPOSITORY \
-          -F branchName=${{ github.base_ref }} \
+          -F githubRepository=${{ github.repository }} \
+          -F branchName=${{ github.head_ref }} \
           -F expectedHeadOid=$(git rev-parse HEAD) \
           -F commitMessage="chore: update coverage banner" \
           -F files[][path]="coverage.svg" -F files[][contents]=$(base64 -w0 coverage.svg) \
