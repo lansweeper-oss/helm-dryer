@@ -81,6 +81,8 @@ jobs:
     - name: Lint Markdown
       uses: actionshub/markdownlint@6c82ff529253530dfbf75c37570876c52692835f  # v3.1.4
     - name: Commit if changes
+      env:
+        GH_TOKEN : ${{ secrets.GITHUB_TOKEN }}
       run: |
         if [ -n "$(git status --porcelain README.md)" ]; then
           gh api graphql \
@@ -126,6 +128,8 @@ jobs:
         fi
         curl "https://img.shields.io/badge/coverage-$COVERAGE_INT%25-$COLOR" > coverage.svg
     - name: Commit if changes
+      env:
+        GH_TOKEN : ${{ secrets.GITHUB_TOKEN }}
       run: |
         if ! git diff --exit-code coverage.svg > /dev/null; then
           gh api graphql \
