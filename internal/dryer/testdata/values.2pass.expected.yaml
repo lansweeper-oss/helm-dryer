@@ -1,0 +1,35 @@
+admins:
+  - platform
+foo-bar:
+  clusterName: eks-cluster-platform
+  controllerConfig:
+    featureGates:
+      SubnetsClusterTagCheck: false
+  enableCertManager: true
+  logLevel: info
+  metricsBindAddress: 127.0.0.1:8080
+  nodeSelector:
+    worker-group: system
+  secondPassTest: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::234796234:role/eks/eks-cluster-foo_bar
+    name: test-template-chart
+  serviceMonitor:
+    enabled: true
+  tolerations:
+    - effect: NoSchedule
+      key: dedicated
+      operator: Equal
+      value: system
+dependencyTest: 2 # from foo-bar chart defaults
+hello-world:
+  fullnameOverride: foo-test-template-chart
+  serviceAccount:
+    name: sa-test-template-chart
+roles:
+  - name: platform
+    role: admin
+tags:
+  foobar: false
+  hello: false

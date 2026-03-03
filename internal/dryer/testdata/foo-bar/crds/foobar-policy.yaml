@@ -1,0 +1,27 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: foobarpolicies.foo-bar.example.com
+spec:
+  group: foo-bar.example.com
+  names:
+    kind: FooBarPolicy
+    listKind: FooBarPolicyList
+    plural: foobarpolicies
+    singular: foobarpolicy
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                target:
+                  type: string
+                action:
+                  type: string

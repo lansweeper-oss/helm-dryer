@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "hello-world.fullname" . }}-test
+  labels:
+    {{- include "hello-world.selectorLabels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test-success # Helm v2 backwards compatible annotation
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "hello-world.fullname" . }}:{{ dig "service" "port" 80 .Values.AsMap }}']
+  restartPolicy: Never

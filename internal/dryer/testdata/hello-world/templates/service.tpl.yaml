@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hello-world.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hello-world.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ dig "service" "port" 80 .Values.AsMap }}
+      targetPort: http
+      protocol: TCP
+      name: {{ dig "service" "name" "http" .Values.AsMap }}
+  selector:
+    {{- include "hello-world.selectorLabels" . | nindent 4 }}

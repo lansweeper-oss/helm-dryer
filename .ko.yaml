@@ -1,0 +1,8 @@
+defaultPlatforms:
+  - linux/arm64
+  - linux/amd64
+defaultLdFlags:
+  - -s -w
+  - -extldflags "-static"
+  - -X github.com/lansweeper-oss/helm-dryer/cmd/dryer.BuildTime={{.Date}}
+  - -X github.com/lansweeper-oss/helm-dryer/cmd/dryer.BuildVersion={{.Git.Tag}}
