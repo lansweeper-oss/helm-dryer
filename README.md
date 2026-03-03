@@ -258,6 +258,7 @@ go run . get -f tests/values.tpl.yaml -f tests/values.stg.tpl.yaml --set cluster
 ```
 
 > Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.
+> Additionally, `fromYaml` and `toYaml` functions are available.
 >
 > At the moment, you can reuse a value already defined **if** the two-pass experimental feature is enabled,
 > e.g. the following is supported:
