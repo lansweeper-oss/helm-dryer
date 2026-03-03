@@ -1,0 +1,127 @@
+version: "2"
+run:
+  timeout: 10m
+
+formatters:
+  # Enable specific formatter.
+  # Default: [] (uses standard Go formatting)
+  enable:
+    - gofmt
+    - goimports
+    - gci
+    - gofumpt
+    # - golines
+
+linters:
+  default: all
+  enable:
+    - goconst
+    - gocritic
+    - gocyclo
+    - govet
+    - misspell
+    - nakedret
+    - prealloc
+    - staticcheck
+    - unconvert
+    - unused
+    - wsl_v5
+  disable:
+    - cyclop # redudant with gocyclo
+    - depguard
+    - exhaustruct
+    - tagalign
+    - wsl
+  settings:
+    funlen:
+      lines: 75
+
+    govet:
+      # report about shadowed variables
+      disable:
+        - shadow
+
+    gocyclo:
+      # minimal code complexity to report, 30 by default (but we recommend 10-20)
+      min-complexity: 15
+
+    dupl:
+      # tokens count to trigger issue, 150 by default
+      threshold: 100
+
+    goconst:
+      # minimal length of string constant, 3 by default
+      min-len: 3
+      # minimal occurrences count to trigger, 3 by default
+      min-occurrences: 5
+      # ignore using literal string "true" during tests
+      ignore-string-values:
+        - 'true'
+
+    lll:
+      # tab width in spaces. Default to 1.
+      tab-width: 1
+
+    nakedret:
+      # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
+      max-func-lines: 30
+
+    gocritic:
+      # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint` run to see all tags and checks.
+      # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
+      enabled-tags:
+        - performance
+
+      settings: # settings passed to gocritic
+        captLocal: # must be valid enabled check name
+          paramsOnly: true
+        rangeValCopy:
+          sizeThreshold: 32
+
+    revive:
+      rules:
+        # What if I want to name my package `utils`?
+        - name: var-naming
+          disabled: true
+
+    wsl_v5:
+      allow-first-in-block: true
+      allow-whole-block: false
+      branch-max-lines: 2
+
+  exclusions:
+    rules:
+      # Exclude some linters from running on tests files.
+      - path: _test(ing)?\.go
+        linters:
+          - dupl
+          - errcheck
+          - errchkjson
+          - forcetypeassert
+          - funlen
+          - gochecknoglobals
+          - gocyclo
+          - gosec
+          - scopelint
+          - unparam
+
+      # Ease some gocritic warnings on test files.
+      - path: _test\.go
+        text: "(unnamedResult|exitAfterDefer)"
+        linters:
+          - gocritic
+
+issues:
+  # Show only new issues: if there are unstaged changes or untracked files,
+  # only those changes are analyzed, else only changes in HEAD~ are analyzed.
+  # It's a super-useful option for integration of golangci-lint into existing
+  # large codebase. It's not practical to fix all existing issues at the moment
+  # of integration: much better don't allow issues in new code.
+  # Default is false.
+  new: false
+
+  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  max-same-issues: 0

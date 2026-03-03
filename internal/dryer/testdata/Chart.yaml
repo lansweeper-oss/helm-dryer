@@ -1,0 +1,15 @@
+apiVersion: v2
+name: test-chart
+version: 1.0.0
+
+dependencies:
+  - name: foo-bar
+    version: 0.1.0
+    repository: file://foo-bar
+    tags:
+      - foobar
+  - name: hello-world
+    version: 0.1.0
+    repository: file://hello-world
+    tags:
+      - hello

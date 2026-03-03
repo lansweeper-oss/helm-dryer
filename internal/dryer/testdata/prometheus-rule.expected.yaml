@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+    helm.sh/hook: "pre-install"
+    helm.sh/hook-delete-policy: "before-hook-creation"
+  labels:
+    app.kubernetes.io/instance: test-template-chart
+    dependencyTest: "2"
+    secondPassTest: "true"
+  name: test-template-chart-prometheus-rules
+spec:
+  groups:
+  - name: foo-bar
+    rules:
+    - alert: foo-bar-pods-on-error
+      annotations:
+        message: >-
+          Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in error state for long time
+      expr: >-
+        absent(up{job="foo-bar"})
+      for: 30m
+      labels:
+        priority: P4
+        service: test-test-template-chart

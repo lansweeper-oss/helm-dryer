@@ -1,0 +1,14 @@
+.*
+**/.*
+**/charts/*.tgz
+**/Chart.lock
+coverage.out
+!.dockerignore
+!.editorconfig
+!.github
+!.gitignore
+!.golangci.yml
+!.ko.yaml
+!.mdlrc
+!.mdl_style.rb
+!.pre-commit-config.yaml

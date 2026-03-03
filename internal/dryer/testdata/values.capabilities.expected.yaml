@@ -1,0 +1,6 @@
+foo:
+  bar:
+  - monitoring.coreos.com/v1/PrometheusRule
+  minorVersion: 33
+  name: test-template-chart
+  namespace: test

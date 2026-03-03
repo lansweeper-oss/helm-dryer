@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-pvc
+  namespace: {{ .Release.Namespace }}
+{{- with .Values.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+{{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storageClass | default "standard" }}
+  resources:
+    requests:
+      storage: {{ .Values.storage | default "10Gi" }}
