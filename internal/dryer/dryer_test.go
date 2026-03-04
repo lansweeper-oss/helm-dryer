@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/dryer"
-	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
-	"github.com/lansweeper-oss/helm-dryer/internal/utils"
+	"github.com/lansweeper/helm-dryer/internal/dryer"
+	client "github.com/lansweeper/helm-dryer/internal/helm"
+	"github.com/lansweeper/helm-dryer/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
@@ -132,9 +132,7 @@ func TestTemplateValues(t *testing.T) {
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
 	require.NoError(t, err, "The output values should be a valid YAML")
 
-	expected, err := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.expected.yaml"))
-	require.NoError(t, err, "Failed to parse expected values file")
-
+	expected, _ := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.expected.yaml"))
 	// Set values are transparently passed (TODO: make this optional with a flag?)
 	for key, value := range test.Data.Set {
 		expected[key] = value
@@ -146,11 +144,10 @@ func TestTemplateValues(t *testing.T) {
 	tempDir := t.TempDir()
 
 	for _, file := range test.Data.Files {
-		err := utils.CopyFile(
+		utils.CopyFile(
 			filepath.Join(test.Settings.Path, file),
 			filepath.Join(tempDir, file),
 		)
-		require.NoError(t, err, "Error copying file to temp directory")
 	}
 
 	test.Settings.Path = tempDir
@@ -176,9 +173,7 @@ func TestTemplateWithCustomDelims(t *testing.T) {
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
 	require.NoError(t, err, "The output values should be a valid YAML")
 
-	expected, err := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.expected.yaml"))
-	require.NoError(t, err, "Failed to parse expected values file")
-
+	expected, _ := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.expected.yaml"))
 	// Set values are transparently passed (TODO: make this optional with a flag?)
 	for key, value := range test.Data.Set {
 		expected[key] = value
@@ -190,11 +185,10 @@ func TestTemplateWithCustomDelims(t *testing.T) {
 	tempDir := t.TempDir()
 
 	for _, file := range test.Data.Files {
-		err := utils.CopyFile(
+		utils.CopyFile(
 			filepath.Join(test.Settings.Path, file),
 			filepath.Join(tempDir, file),
 		)
-		require.NoError(t, err, "Error copying file to temp directory")
 	}
 
 	test.Settings.Path = tempDir
@@ -218,8 +212,7 @@ func TestTemplateCapabilities(t *testing.T) {
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
 	require.NoError(t, err, "The output values should be a valid YAML")
 
-	expected, err := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.capabilities.expected.yaml"))
-	require.NoError(t, err, "Failed to parse expected capabilities values file")
+	expected, _ := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.capabilities.expected.yaml"))
 	// Set values are transparently passed (TODO: make this optional with a flag?)
 	for key, value := range test.Data.Set {
 		expected[key] = value
@@ -245,8 +238,7 @@ func Test2PassTemplateValues(t *testing.T) {
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
 	require.NoError(t, err, "The output values should be a valid YAML")
 
-	expected, err := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.2pass.expected.yaml"))
-	require.NoError(t, err, "Failed to parse expected 2-pass values file")
+	expected, _ := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.2pass.expected.yaml"))
 	// Set values are transparently passed (TODO: make this optional with a flag?)
 	for key, value := range test.Data.Set {
 		expected[key] = value

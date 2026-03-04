@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/utils"
+	"github.com/lansweeper/helm-dryer/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -341,7 +341,7 @@ func TestIsDir(t *testing.T) {
 				t.Helper()
 				dir := t.TempDir()
 				file := filepath.Join(dir, "testfile.txt")
-				err := os.WriteFile(file, []byte("test content"), utils.ReadWrite)
+				err := os.WriteFile(file, []byte("test content"), 0o644)
 				require.NoError(t, err)
 
 				return file
@@ -361,7 +361,7 @@ func TestIsDir(t *testing.T) {
 				t.Helper()
 				dir := t.TempDir()
 				nestedDir := filepath.Join(dir, "nested", "deep")
-				err := os.MkdirAll(nestedDir, utils.ReadWriteDir)
+				err := os.MkdirAll(nestedDir, 0o755)
 				require.NoError(t, err)
 
 				return nestedDir
@@ -471,7 +471,7 @@ func TestCopyFile(t *testing.T) {
 		dstFile := filepath.Join(dstDir, "dest.txt")
 
 		content := []byte("hello world")
-		err := os.WriteFile(srcFile, content, utils.ReadWrite)
+		err := os.WriteFile(srcFile, content, 0o644)
 		require.NoError(t, err)
 
 		err = utils.CopyFile(srcFile, dstFile)
@@ -496,7 +496,7 @@ func TestCopyFile(t *testing.T) {
 		t.Parallel()
 
 		srcFile := filepath.Join(t.TempDir(), "source.txt")
-		err := os.WriteFile(srcFile, []byte("data"), utils.ReadWrite)
+		err := os.WriteFile(srcFile, []byte("data"), 0o644)
 		require.NoError(t, err)
 
 		err = utils.CopyFile(srcFile, "/nonexistent/dir/dest.txt")
@@ -505,82 +505,42 @@ func TestCopyFile(t *testing.T) {
 	})
 }
 
-func TestDeepCopyWithSlices(t *testing.T) {
+func TestEnsureDirExists(t *testing.T) {
 	t.Parallel()
 
-	t.Run("copies []any slices deeply", func(t *testing.T) {
+	t.Run("creates directory when it does not exist", func(t *testing.T) {
 		t.Parallel()
 
-		original := map[string]any{
-			"list": []any{"a", "b", map[string]any{"nested": "value"}},
-		}
+		dir := filepath.Join(t.TempDir(), "newdir")
 
-		result, err := utils.DeepCopy(original)
+		err := utils.EnsureDirExists(dir, utils.ReadWrite)
 		require.NoError(t, err)
-		assert.Equal(t, original, result)
 
-		// Verify the slice is a different instance
-		origSlice := original["list"].([]any)
-		copySlice := result["list"].([]any)
-		origSlice[0] = "modified"
-
-		assert.Equal(t, "a", copySlice[0], "Modifying original slice should not affect copy")
+		info, err := os.Stat(dir)
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
 	})
 
-	t.Run("copies nested maps inside slices", func(t *testing.T) {
+	t.Run("succeeds when directory already exists", func(t *testing.T) {
 		t.Parallel()
 
-		original := map[string]any{
-			"items": []any{
-				map[string]any{"key": "value1"},
-				map[string]any{"key": "value2"},
-			},
-		}
+		dir := t.TempDir()
 
-		result, err := utils.DeepCopy(original)
+		err := utils.EnsureDirExists(dir, utils.ReadWrite)
 		require.NoError(t, err)
-
-		// Modify nested map in original
-		original["items"].([]any)[0].(map[string]any)["key"] = "modified"
-
-		assert.Equal(t, "value1", result["items"].([]any)[0].(map[string]any)["key"],
-			"Modifying nested map in original slice should not affect copy")
-	})
-}
-
-func TestFromYaml(t *testing.T) {
-	t.Parallel()
-
-	tpl := utils.GetTemplate("missingkey=zero", "{{", "}}")
-
-	t.Run("valid", func(t *testing.T) {
-		t.Parallel()
-
-		tmpl, err := tpl.Clone()
-		require.NoError(t, err)
-		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.name }}`)
-		require.NoError(t, err)
-
-		var buf bytes.Buffer
-
-		err = tmpl.Execute(&buf, map[string]any{"input": "name: test\nversion: 1"})
-		require.NoError(t, err)
-		assert.Equal(t, "test", buf.String())
 	})
 
-	t.Run("invalid", func(t *testing.T) {
+	t.Run("creates nested directories", func(t *testing.T) {
 		t.Parallel()
 
-		tmpl, err := tpl.Clone()
-		require.NoError(t, err)
-		tmpl, err = tmpl.Parse(`{{ $m := fromYaml .input }}{{ $m.Error }}`)
+		dir := filepath.Join(t.TempDir(), "a", "b", "c")
+
+		err := utils.EnsureDirExists(dir, utils.ReadWrite)
 		require.NoError(t, err)
 
-		var buf bytes.Buffer
-
-		err = tmpl.Execute(&buf, map[string]any{"input": ": invalid: yaml: ["})
+		info, err := os.Stat(dir)
 		require.NoError(t, err)
-		assert.NotEmpty(t, buf.String(), "should contain error message")
+		assert.True(t, info.IsDir())
 	})
 }
 
@@ -628,58 +588,6 @@ func TestGetTemplate(t *testing.T) {
 	})
 }
 
-func TestToBoolean(t *testing.T) {
-	t.Parallel()
-	// Test case 1: Input is "true" (case insensitive)
-	assert.True(t, utils.ToBoolean("true"), "ToBoolean should return true for 'true'")
-	assert.True(t, utils.ToBoolean("TRUE"), "ToBoolean should return true for 'TRUE'")
-	assert.True(t, utils.ToBoolean("TrUe"), "ToBoolean should return true for 'TrUe'")
-
-	// Test case 2: Input is not "true"
-	assert.False(t, utils.ToBoolean("false"), "ToBoolean should return false for 'false'")
-	assert.False(t, utils.ToBoolean("yes"), "ToBoolean should return false for 'yes'")
-	assert.False(t, utils.ToBoolean("1"), "ToBoolean should return false for '1'")
-	assert.False(t, utils.ToBoolean(""), "ToBoolean should return false for an empty string")
-	assert.False(t, utils.ToBoolean("random"), "ToBoolean should return false for 'random'")
-}
-
-func TestToYaml(t *testing.T) {
-	t.Parallel()
-
-	tpl := utils.GetTemplate("missingkey=zero", "{{", "}}")
-
-	t.Run("map", func(t *testing.T) {
-		t.Parallel()
-
-		tmpl, err := tpl.Clone()
-		require.NoError(t, err)
-		tmpl, err = tmpl.Parse(`{{ .data | toYaml }}`)
-		require.NoError(t, err)
-
-		var buf bytes.Buffer
-
-		err = tmpl.Execute(&buf, map[string]any{"data": map[string]any{"key": "value", "num": 42}})
-		require.NoError(t, err)
-		assert.Contains(t, buf.String(), "key: value")
-		assert.Contains(t, buf.String(), "num: 42")
-	})
-
-	t.Run("nil", func(t *testing.T) {
-		t.Parallel()
-
-		tmpl, err := tpl.Clone()
-		require.NoError(t, err)
-		tmpl, err = tmpl.Parse(`{{ .data | toYaml }}`)
-		require.NoError(t, err)
-
-		var buf bytes.Buffer
-
-		err = tmpl.Execute(&buf, map[string]any{"data": nil})
-		require.NoError(t, err)
-		assert.Equal(t, "null", buf.String())
-	})
-}
-
 func TestWriteOutput(t *testing.T) {
 	t.Parallel()
 	t.Run("writes to file", func(t *testing.T) {
@@ -716,4 +624,62 @@ func TestWriteOutput(t *testing.T) {
 		err := utils.WriteOutput([]byte("stdout data"), "-")
 		require.NoError(t, err)
 	})
+}
+
+func TestDeepCopyWithSlices(t *testing.T) {
+	t.Parallel()
+
+	t.Run("copies []any slices deeply", func(t *testing.T) {
+		t.Parallel()
+
+		original := map[string]any{
+			"list": []any{"a", "b", map[string]any{"nested": "value"}},
+		}
+
+		result, err := utils.DeepCopy(original)
+		require.NoError(t, err)
+		assert.Equal(t, original, result)
+
+		// Verify the slice is a different instance
+		origSlice := original["list"].([]any)
+		copySlice := result["list"].([]any)
+		origSlice[0] = "modified"
+
+		assert.Equal(t, "a", copySlice[0], "Modifying original slice should not affect copy")
+	})
+
+	t.Run("copies nested maps inside slices", func(t *testing.T) {
+		t.Parallel()
+
+		original := map[string]any{
+			"items": []any{
+				map[string]any{"key": "value1"},
+				map[string]any{"key": "value2"},
+			},
+		}
+
+		result, err := utils.DeepCopy(original)
+		require.NoError(t, err)
+
+		// Modify nested map in original
+		original["items"].([]any)[0].(map[string]any)["key"] = "modified"
+
+		assert.Equal(t, "value1", result["items"].([]any)[0].(map[string]any)["key"],
+			"Modifying nested map in original slice should not affect copy")
+	})
+}
+
+func TestToBoolean(t *testing.T) {
+	t.Parallel()
+	// Test case 1: Input is "true" (case insensitive)
+	assert.True(t, utils.ToBoolean("true"), "ToBoolean should return true for 'true'")
+	assert.True(t, utils.ToBoolean("TRUE"), "ToBoolean should return true for 'TRUE'")
+	assert.True(t, utils.ToBoolean("TrUe"), "ToBoolean should return true for 'TrUe'")
+
+	// Test case 2: Input is not "true"
+	assert.False(t, utils.ToBoolean("false"), "ToBoolean should return false for 'false'")
+	assert.False(t, utils.ToBoolean("yes"), "ToBoolean should return false for 'yes'")
+	assert.False(t, utils.ToBoolean("1"), "ToBoolean should return false for '1'")
+	assert.False(t, utils.ToBoolean(""), "ToBoolean should return false for an empty string")
+	assert.False(t, utils.ToBoolean("random"), "ToBoolean should return false for 'random'")
 }

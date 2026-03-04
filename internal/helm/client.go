@@ -7,25 +7,17 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/cli"
-	"github.com/lansweeper-oss/helm-dryer/internal/utils"
-	"github.com/lansweeper-oss/helm-dryer/internal/values"
+	"github.com/lansweeper/helm-dryer/internal/cli"
+	"github.com/lansweeper/helm-dryer/internal/utils"
+	"github.com/lansweeper/helm-dryer/internal/values"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/downloader"
 	"helm.sh/helm/v3/pkg/getter"
 	ociRegistry "helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
-)
-
-const (
-	ChartsFolder    = "charts"
-	LocalRepoPrefix = "file://"
 )
 
 // Client is a client for interacting with Helm charts.
@@ -41,6 +33,7 @@ type Client struct {
 type Options struct {
 	DelimLeft       string
 	DelimRight      string
+	PassPending     bool
 	TemplateOptions string
 }
 
@@ -96,14 +89,8 @@ func TemplateAndParseYaml(
 	return yamlData, nil
 }
 
-// StaleDependencies returns which Helm chart dependencies need an update.
-func (h *Client) StaleDependencies() []*chart.Dependency {
-	if h.UpdateDependencies {
-		return h.Chart.Metadata.Dependencies
-	}
-
-	needUpdate := []*chart.Dependency{}
-
+// DependenciesNeedUpdate checks if the dependencies of a Helm chart need to be updated.
+func (h *Client) DependenciesNeedUpdate() bool {
 	for _, dependency := range h.Chart.Metadata.Dependencies {
 		slog.Debug("Checking dependency: " + dependency.Name + " version: " + dependency.Version)
 
@@ -111,11 +98,11 @@ func (h *Client) StaleDependencies() []*chart.Dependency {
 		if !exists {
 			slog.Debug("Dependency not found, triggering an update")
 
-			needUpdate = append(needUpdate, dependency)
+			return true
 		}
 	}
 
-	return needUpdate
+	return false
 }
 
 // HasDependencies checks if the Helm chart has any dependencies defined in its Chart.yaml file.
@@ -160,15 +147,13 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 
 	h.deduplicateDependencies()
 
-	dependenciesToUpdate := h.StaleDependencies()
-
-	if len(dependenciesToUpdate) > 0 {
-		err = h.UpdateDeps(dependenciesToUpdate)
+	if h.UpdateDependencies || h.DependenciesNeedUpdate() {
+		err = h.UpdateDeps()
 		if err != nil {
 			return nil, fmt.Errorf("could not update dependencies: %w", err)
 		}
 
-		err = h.CacheDependencies(dependenciesToUpdate)
+		err = h.CacheDependencies()
 		if err != nil {
 			return nil, fmt.Errorf("could not store chart dependencies: %w", err)
 		}
@@ -187,7 +172,7 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 // It reads the values files from the dependencies and merges them into a single map where the
 // root keys are the names of the dependencies.
 func (h *Client) ReadDependenciesValues() (map[string]any, error) {
-	dir := filepath.Join(h.Path, ChartsFolder)
+	dir := filepath.Join(h.Path, "charts")
 	vals := map[string]any{}
 
 	for _, dependency := range h.Chart.Dependencies() {
@@ -222,127 +207,19 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 }
 
 // UpdateDeps updates the dependencies of a Helm chart located at the specified path.
-func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
-	chartsDir := filepath.Join(h.Path, ChartsFolder)
-
-	downloader, err := h.chartDownloader()
-	if err != nil {
-		return fmt.Errorf("failed to create chart downloader: %w", err)
-	}
-
-	settings := helmCli.EnvSettings{
-		Debug:           h.Debug,
-		RepositoryCache: getCacheDir(),
-	}
-
-	for _, dep := range dependencies {
-		switch {
-		case strings.HasPrefix(dep.Repository, LocalRepoPrefix):
-			err = h.packageLocalDependency(dep, chartsDir)
-		case ociRegistry.IsOCI(dep.Repository):
-			ref := strings.TrimRight(dep.Repository, "/") + "/" + dep.Name
-			slog.Debug("Downloading OCI dependency", "ref", ref, "version", dep.Version)
-
-			_, _, err = downloader.DownloadTo(ref, dep.Version, chartsDir)
-		default:
-			var chartURL string
-
-			chartURL, err = repo.FindChartInRepoURL(
-				dep.Repository, dep.Name, dep.Version,
-				"", "", "",
-				getter.All(&settings),
-			)
-			if err != nil {
-				err = fmt.Errorf("failed to resolve chart URL for %s: %w", dep.Name, err)
-
-				break
-			}
-
-			slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
-
-			_, _, err = downloader.DownloadTo(chartURL, dep.Version, chartsDir)
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to download dependency %s-%s: %w", dep.Name, dep.Version, err)
-		}
-
-		slog.Debug("Dependency downloaded", "name", dep.Name, "version", dep.Version)
-	}
-
-	return nil
-}
-
-// chartDownloader sets up the proper credentials and cache settings.
-func (h *Client) chartDownloader() (*downloader.ChartDownloader, error) {
+func (h *Client) UpdateDeps() error {
 	cacheDir := getCacheDir()
-
+	slog.Debug(fmt.Sprintf("Updating dependencies from: %s (cache: %s)", h.Path, cacheDir))
 	settings := helmCli.EnvSettings{
 		Debug:           h.Debug,
 		RepositoryCache: cacheDir,
 	}
-
-	registryClient, err := h.registryClient()
+	// We need to override this since Helm internals do not honor the getter settings :(
+	err := os.Setenv(Cache, cacheDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create registry client: %w", err)
+		return fmt.Errorf("failed to set environment variable %s: %w", Cache, err)
 	}
 
-	return &downloader.ChartDownloader{
-		Out:             os.Stderr,
-		Verify:          downloader.VerifyNever,
-		RepositoryCache: cacheDir,
-		RegistryClient:  registryClient,
-		Getters:         getter.All(&settings),
-	}, nil
-}
-
-// deduplicateDependencies remove duplicates from the dependencies list.
-func (h *Client) deduplicateDependencies() {
-	slog.Debug("Deduplicating chart dependencies")
-
-	seen := make(map[string]struct{}, len(h.Chart.Metadata.Dependencies))
-	dependencies := make([]*chart.Dependency, 0, len(h.Chart.Metadata.Dependencies))
-
-	for _, dependency := range h.Chart.Metadata.Dependencies {
-		// We cannot rely on dependency.Enabled since apparently Helm does not honor
-		// omitempty when reading the Chart.yaml file.
-		key := dependencyKey(dependency)
-		if _, exists := seen[key]; !exists {
-			seen[key] = struct{}{}
-
-			dependencies = append(dependencies, dependency)
-		}
-	}
-
-	h.Chart.Metadata.Dependencies = dependencies
-}
-
-// packageLocalDependency packages a local dependency into the charts directory.
-func (h *Client) packageLocalDependency(dep *chart.Dependency, destDir string) error {
-	localPath := strings.TrimPrefix(dep.Repository, LocalRepoPrefix)
-	if !filepath.IsAbs(localPath) {
-		localPath = filepath.Join(h.Path, localPath)
-	}
-
-	localPath = filepath.Clean(localPath)
-
-	slog.Debug("Packaging local dependency", "path", localPath)
-
-	localChart, err := loader.LoadDir(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to load local chart from %s: %w", localPath, err)
-	}
-
-	_, err = chartutil.Save(localChart, destDir)
-	if err != nil {
-		return fmt.Errorf("failed to package local chart %s: %w", dep.Name, err)
-	}
-
-	return nil
-}
-
-// registryClient creates and authenticates an OCI registry client using the configured credentials.
-func (h *Client) registryClient() (*ociRegistry.Client, error) {
 	clientOpts := []ociRegistry.ClientOption{
 		ociRegistry.ClientOptDebug(h.Debug),
 		ociRegistry.ClientOptEnableCache(true),
@@ -364,15 +241,53 @@ func (h *Client) registryClient() (*ociRegistry.Client, error) {
 
 	registryClient, err := ociRegistry.NewClient(clientOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create OCI registry client: %w", err)
+		return fmt.Errorf("failed to create OCI registry client: %w", err)
 	}
 
 	if opt != nil {
 		err = registryClient.Login(h.Credentials.Registry, opt)
 		if err != nil {
-			return nil, fmt.Errorf("failed to login to OCI registry: %w", err)
+			return fmt.Errorf("failed to login to OCI registry: %w", err)
 		}
 	}
 
-	return registryClient, nil
+	manager := &downloader.Manager{
+		ChartPath:       h.Path,
+		Getters:         getter.All(&settings),
+		Out:             os.Stderr,
+		RegistryClient:  registryClient,
+		RepositoryCache: cacheDir,
+		SkipUpdate:      false,
+		Verify:          downloader.VerifyNever,
+	}
+
+	err = manager.Update()
+	if err != nil {
+		return fmt.Errorf("failed to update dependencies: %w", err)
+	}
+
+	slog.Debug("Dependencies updated")
+
+	return nil
+}
+
+// deduplicateDependencies remove duplicates from the dependencies list.
+func (h *Client) deduplicateDependencies() {
+	slog.Debug("Deduplicating chart dependencies")
+
+	seen := make(map[string]struct{}, len(h.Chart.Metadata.Dependencies))
+	dependencies := make([]*chart.Dependency, 0, len(h.Chart.Metadata.Dependencies))
+
+	for _, dependency := range h.Chart.Metadata.Dependencies {
+		// We cannot rely on dependency.Enabled since apparently Helm does not honor
+		// omitempty when reading the Chart.yaml file.
+		key := dependencyKey(dependency)
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+
+			dependencies = append(dependencies, dependency)
+		}
+	}
+
+	h.Chart.Metadata.Dependencies = dependencies
 }

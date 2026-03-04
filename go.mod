@@ -1,4 +1,4 @@
-module github.com/lansweeper-oss/helm-dryer
+module github.com/lansweeper/helm-dryer
 
 go 1.26.0
 

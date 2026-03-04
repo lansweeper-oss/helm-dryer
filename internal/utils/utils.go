@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	ReadOnly     = 0o440
-	ReadWrite    = 0o644
-	ReadWriteDir = 0o750
+	ReadOnly  = 0o440
+	ReadWrite = 0o750
 )
 
 // templateFuncs is the cached Sprig function map with env/expandenv removed.
@@ -32,32 +31,6 @@ func init() {
 	templateFuncs = sprig.FuncMap()
 	delete(templateFuncs, "env")
 	delete(templateFuncs, "expandenv")
-	templateFuncs["toYaml"] = toYAML
-	templateFuncs["fromYaml"] = fromYAML
-}
-
-// fromYAML converts a YAML string into a map[string]any.
-func fromYAML(str string) map[string]any {
-	result := map[string]any{}
-
-	err := yaml.Unmarshal([]byte(str), &result)
-	if err != nil {
-		result["Error"] = err.Error()
-	}
-
-	return result
-}
-
-// toYAML marshals a value to YAML and returns it as a string.
-// Unlike Helm's implementation which silently returns "", this returns an error
-// so that text/template propagates marshaling failures through Execute.
-func toYAML(val any) (string, error) {
-	data, err := yaml.Marshal(val)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal value to YAML: %w", err)
-	}
-
-	return strings.TrimSuffix(string(data), "\n"), nil
 }
 
 // CopyFile copies a file from the source path to the destination path.
@@ -69,7 +42,7 @@ func CopyFile(src, dst string) error {
 		return fmt.Errorf("failed to read file %s: %w", src, err)
 	}
 
-	err = os.WriteFile(dst, data, ReadWriteDir)
+	err = os.WriteFile(dst, data, ReadWrite)
 	if err != nil {
 		return fmt.Errorf("failed to write destination file %s: %w", dst, err)
 	}
@@ -123,6 +96,21 @@ func innerDeepCopy(value any) (any, error) {
 	}
 }
 
+// EnsureDirExists checks if a directory exists, and if not, creates it with the specified permissions.
+func EnsureDirExists(dir string, folderPermissions os.FileMode) error {
+	_, err := os.Stat(dir)
+	if err != nil {
+		slog.Debug("Creating folder: " + dir)
+
+		err := os.MkdirAll(dir, folderPermissions)
+		if err != nil {
+			return fmt.Errorf("failed to create cache directory: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // GetEnv retrieves the value of an environment variable.
 // If the variable is not set, it returns the provided fallback value.
 func GetEnv(key, fallback string) string {
@@ -151,14 +139,8 @@ func GetTemplate(options, left, right string) *template.Template {
 // Files modified before this cutoff are considered expired.
 // If the TTL string is invalid, return a zero time indicating that caching is disabled.
 func GetTTL(ttl string) time.Time {
-	if ttl == "" {
-		return time.Time{}
-	}
-
 	duration, err := time.ParseDuration(ttl)
 	if err != nil {
-		slog.Warn("Invalid TTL format, caching disabled", "ttl", ttl, "error", err)
-
 		return time.Time{}
 	}
 

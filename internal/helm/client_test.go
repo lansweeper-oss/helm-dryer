@@ -7,19 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/cli"
-	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
-	utils "github.com/lansweeper-oss/helm-dryer/internal/utils"
+	"github.com/lansweeper/helm-dryer/internal/cli"
+	client "github.com/lansweeper/helm-dryer/internal/helm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/chart"
 )
 
-func TestStaleDependencies(t *testing.T) {
+func TestDependenciesNeedUpdate(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary directory to simulate a chart path
 	tempDir := t.TempDir()
+	defer os.RemoveAll(tempDir)
 
 	// Create a dummy Chart.yaml file with dependencies
 	chartFile := filepath.Join(tempDir, "Chart.yaml")
@@ -30,177 +30,35 @@ version: 0.1.0
 dependencies:
   - name: redis
     version: 6.0.0
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err, "Failed to create Chart.yaml")
 
+	// Test case: DependenciesNeedUpdate returns true when dependency is missing
 	helmClient := client.Client{Path: tempDir, Debug: true}
 	err = helmClient.LoadChart()
 	require.NoError(t, err, "Failed to load chart")
 
-	// Test case: returns the missing dependency when archive is absent
-	staleDeps := helmClient.StaleDependencies()
-	require.Len(t, staleDeps, 1, "should return the missing dependency")
-	assert.Equal(t, "redis", staleDeps[0].Name)
+	needsUpdate := helmClient.DependenciesNeedUpdate()
+	assert.True(t, needsUpdate, "DependenciesNeedUpdate should return true when dependency is missing")
 
 	// Create a dummy dependency file to simulate an existing dependency
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.Mkdir(chartsDir, utils.ReadWriteDir)
+	chartsDir := filepath.Join(tempDir, "charts")
+	err = os.Mkdir(chartsDir, 0o700)
 	require.NoError(t, err, "Failed to create dependencies directory")
 
 	dependencyFile := filepath.Join(chartsDir, "redis-6.0.0.tgz")
-	err = os.WriteFile(dependencyFile, []byte("dummy content"), utils.ReadWrite)
+	err = os.WriteFile(dependencyFile, []byte("dummy content"), 0o644)
 	require.NoError(t, err, "Failed to create dependency file")
 
-	// Test case: returns all deps when TTL is zero (caching disabled)
-	staleDeps = helmClient.StaleDependencies()
-	assert.Len(t, staleDeps, 1, "should return all deps when TTL is zero (caching disabled)")
+	// Test case: DependenciesNeedUpdate returns true when TTL is set to zero
+	needsUpdate = helmClient.DependenciesNeedUpdate()
+	assert.True(t, needsUpdate, "DependenciesNeedUpdate should return true when dependencies are expired")
 
-	// Test case: returns empty slice when all dependencies exist and TTL is not expired.
+	// Test case: DependenciesNeedUpdate returns false when all dependencies exists and TTL is not expired.
 	// h.TTL field represents a cutoff time, files modified after this time are considered valid.
 	helmClient.TTL = time.Now().Add(-10 * time.Minute)
-	staleDeps = helmClient.StaleDependencies()
-	assert.Empty(t, staleDeps, "should return empty slice when all deps are fresh")
-}
-
-func TestUpdateDepsFileProtocol(t *testing.T) {
-	tempDir := t.TempDir()
-	cacheDir := t.TempDir()
-	t.Setenv("HELM_CACHE_HOME", cacheDir)
-
-	// Create two sub-charts
-	for _, sub := range []struct{ name, version, value string }{
-		{"subchart-a", "0.1.0", "valueA: true"},
-		{"subchart-b", "0.2.0", "valueB: 42"},
-	} {
-		subDir := filepath.Join(tempDir, sub.name)
-		err := os.MkdirAll(subDir, utils.ReadWriteDir)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(subDir, "Chart.yaml"), fmt.Appendf(nil,
-			"apiVersion: v2\nname: %s\nversion: %s\n", sub.name, sub.version), utils.ReadWrite)
-		require.NoError(t, err)
-		err = os.WriteFile(filepath.Join(subDir, "values.yaml"), []byte(sub.value+"\n"), utils.ReadWrite)
-		require.NoError(t, err)
-	}
-
-	// Create parent chart depending on both sub-charts
-	parentDir := filepath.Join(tempDir, "parent")
-	err := os.MkdirAll(parentDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(parentDir, "Chart.yaml"), []byte(`apiVersion: v2
-name: parent
-version: 0.1.0
-dependencies:
-  - name: subchart-a
-    version: 0.1.0
-    repository: file://../subchart-a
-  - name: subchart-b
-    version: 0.2.0
-    repository: file://../subchart-b
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	chartsDir := filepath.Join(parentDir, client.ChartsFolder)
-	err = os.Mkdir(chartsDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	helmClient := client.Client{Path: parentDir, Debug: true}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	// Pre-populate subchart-a as already present (fresh)
-	preExisting := filepath.Join(chartsDir, "subchart-a-0.1.0.tgz")
-	err = os.WriteFile(preExisting, []byte("pre-existing"), utils.ReadWrite)
-	require.NoError(t, err)
-	preExistingInfo, err := os.Stat(preExisting)
-	require.NoError(t, err)
-
-	// Only update subchart-b (the stale one)
-	staleDep := helmClient.Chart.Metadata.Dependencies[1]
-	err = helmClient.UpdateDeps([]*chart.Dependency{staleDep})
-	require.NoError(t, err)
-
-	// Verify subchart-b was downloaded
-	downloadedArchive := filepath.Join(chartsDir, "subchart-b-0.2.0.tgz")
-	_, err = os.Stat(downloadedArchive)
-	require.NoError(t, err, "subchart-b archive should exist after selective download")
-
-	// Verify subchart-a was NOT re-downloaded (modtime unchanged)
-	afterInfo, err := os.Stat(preExisting)
-	require.NoError(t, err)
-	assert.Equal(t, preExistingInfo.ModTime(), afterInfo.ModTime(),
-		"pre-existing dependency should not have been modified")
-}
-
-func TestUpdateDepsInvalidRepo(t *testing.T) {
-	tempDir := t.TempDir()
-	cacheDir := t.TempDir()
-	t.Setenv("HELM_CACHE_HOME", cacheDir)
-
-	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`apiVersion: v2
-name: test
-version: 0.1.0
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.Mkdir(chartsDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	helmClient := client.Client{Path: tempDir, Debug: true}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	err = helmClient.UpdateDeps([]*chart.Dependency{
-		{Name: "nonexistent", Version: "1.0.0", Repository: "https://invalid.example.com/charts"},
-	})
-	require.Error(t, err, "should fail for invalid repository URL")
-	assert.Contains(t, err.Error(), "nonexistent")
-}
-
-func TestStaleDependenciesMultipleDeps(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-
-	chartFile := filepath.Join(tempDir, "Chart.yaml")
-	err := os.WriteFile(chartFile, []byte(`
-apiVersion: v2
-name: test-chart
-version: 0.1.0
-dependencies:
-  - name: redis
-    version: 6.0.0
-  - name: nginx
-    version: 1.0.0
-  - name: postgres
-    version: 15.0.0
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	// Load the chart before creating charts/ so loader.LoadDir does not
-	// attempt to unpack dummy archive files.
-	helmClient := client.Client{
-		Path:  tempDir,
-		Debug: true,
-		TTL:   time.Now().Add(-10 * time.Minute),
-	}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.Mkdir(chartsDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	// Pre-populate redis and postgres as fresh, leave nginx missing
-	err = os.WriteFile(filepath.Join(chartsDir, "redis-6.0.0.tgz"), []byte("dummy"), utils.ReadWrite)
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(chartsDir, "postgres-15.0.0.tgz"), []byte("dummy"), utils.ReadWrite)
-	require.NoError(t, err)
-
-	staleDeps := helmClient.StaleDependencies()
-	require.Len(t, staleDeps, 1, "should return only the missing dependency")
-	assert.Equal(t, "nginx", staleDeps[0].Name)
+	needsUpdate = helmClient.DependenciesNeedUpdate()
+	assert.False(t, needsUpdate, "DependenciesNeedUpdate should return false when the TTL is not expired")
 }
 
 func TestEnsureCacheDirs(t *testing.T) {
@@ -252,12 +110,12 @@ dependencies:
   - name: `+chartName+`
     version: `+chartVersion+`
     repository: `+chartRepository+`
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err, "Failed to create Chart.yaml")
 
 	// Create a dummy charts directory to simulate dependencies
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.Mkdir(chartsDir, utils.ReadWriteDir)
+	chartsDir := filepath.Join(tempDir, "charts")
+	err = os.Mkdir(chartsDir, 0o750)
 	require.NoError(t, err, "Failed to create charts directory")
 
 	// Test case: UpdateDeps with a valid chart path
@@ -328,22 +186,19 @@ dependencies:
     name: cert-manager
     version: `+chartVersion+`
     alias: test
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err, "Failed to create Chart.yaml")
 
 	// Create charts directory and dependency files
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.Mkdir(chartsDir, utils.ReadWriteDir)
+	chartsDir := filepath.Join(tempDir, "charts")
+	err = os.Mkdir(chartsDir, 0o755)
 	require.NoError(t, err, "Failed to create charts directory")
 
 	helmClient := client.Client{Path: tempDir, Debug: true}
 	// Downloaded file contains v in the version for this chart :(
 	archiveFile := fmt.Sprintf("%s-v%s.tgz", chartName, chartVersion)
 
-	err = helmClient.LoadChart()
-	require.NoError(t, err, "Failed to load chart")
-
-	err = helmClient.UpdateDeps(helmClient.Chart.Metadata.Dependencies)
+	err = helmClient.UpdateDeps()
 	require.NoError(t, err, "UpdateDeps should not return an error")
 
 	// Verify that the dependency file was retrieved
@@ -358,22 +213,10 @@ dependencies:
 	err = client.EnsureCacheDirs(tempDir)
 	require.NoError(t, err, "Failed to ensure cache directories")
 
-	// Build deps from loaded chart to get actual versions (e.g. v1.18.2 not 1.18.2).
-	dependencies := helmClient.Chart.Dependencies()
-
-	loadedDeps := make([]*chart.Dependency, 0, len(dependencies))
-	for _, c := range dependencies {
-		loadedDeps = append(loadedDeps, &chart.Dependency{
-			Name:    c.Metadata.Name,
-			Version: c.Metadata.Version,
-		})
-	}
-
 	// Verify that dependency files were copied to cache
-	err = helmClient.CacheDependencies(loadedDeps)
-	require.NoError(t, err, "CacheDependencies should not return an error")
+	helmClient.CacheDependencies()
 
-	cachedChart := filepath.Join(cacheDir, client.ChartsFolder, archiveFile)
+	cachedChart := filepath.Join(cacheDir, "charts", archiveFile)
 	_, err = os.Stat(cachedChart)
 	require.NoError(t, err, archiveFile+" should exist in cache")
 	_, err = os.ReadFile(cachedChart)
@@ -383,12 +226,22 @@ dependencies:
 	err = os.Remove(archivedChart)
 	require.NoError(t, err, "Failed to remove test dependency file")
 
-	err = helmClient.CacheDependencies(loadedDeps)
+	err = helmClient.CacheDependencies()
 	assert.Contains(t, err.Error(), fmt.Sprintf("failed to copy chart %s to cache directory", archiveFile))
 
-	// Test case: StoreDeps with no dependencies is a no-op
-	err = helmClient.CacheDependencies(nil)
-	assert.NoError(t, err, "CacheDependencies should not return an error for empty list")
+	// Test case: StoreDeps with chart that has no dependencies
+	err = os.WriteFile(chartFile, []byte(`
+apiVersion: v2
+name: test-chart-no-deps
+version: 0.1.0
+`), 0o644)
+	require.NoError(t, err, "Failed to create Chart.yaml without dependencies")
+
+	err = helmClient.LoadChart()
+	require.NoError(t, err, "Failed to load chart without dependencies")
+
+	err = helmClient.CacheDependencies()
+	assert.NoError(t, err, "StoreDeps should not return an error for a chart without dependencies")
 }
 
 func TestReadChartDependenciesReloadsAfterUpdate(t *testing.T) {
@@ -396,22 +249,22 @@ func TestReadChartDependenciesReloadsAfterUpdate(t *testing.T) {
 
 	// Create a sub-chart with its own Chart.yaml and values.yaml
 	subChartDir := filepath.Join(tempDir, "subchart")
-	err := os.MkdirAll(subChartDir, utils.ReadWriteDir)
+	err := os.MkdirAll(subChartDir, 0o755)
 	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(subChartDir, "Chart.yaml"), []byte(`apiVersion: v2
 name: subchart
 version: 0.1.0
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(subChartDir, "values.yaml"), []byte(`replicaCount: 3
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err)
 
 	// Create the parent chart referencing the sub-chart via file://
 	parentDir := filepath.Join(tempDir, "parent")
-	err = os.MkdirAll(parentDir, utils.ReadWriteDir)
+	err = os.MkdirAll(parentDir, 0o755)
 	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(parentDir, "Chart.yaml"), []byte(`apiVersion: v2
@@ -421,7 +274,7 @@ dependencies:
   - name: subchart
     version: 0.1.0
     repository: file://../subchart
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err)
 
 	// charts/ directory is intentionally absent — EnsureCacheDirs will create it.
@@ -478,22 +331,22 @@ func TestDeduplicateDependencies(t *testing.T) {
 
 	// Create a sub-chart
 	subChartDir := filepath.Join(tempDir, "subchart")
-	err := os.MkdirAll(subChartDir, utils.ReadWriteDir)
+	err := os.MkdirAll(subChartDir, 0o755)
 	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(subChartDir, "Chart.yaml"), []byte(`apiVersion: v2
 name: subchart
 version: 0.1.0
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(subChartDir, "values.yaml"), []byte(`enabled: true
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err)
 
 	// Parent chart with the same dependency listed twice
 	parentDir := filepath.Join(tempDir, "parent")
-	err = os.MkdirAll(parentDir, utils.ReadWriteDir)
+	err = os.MkdirAll(parentDir, 0o755)
 	require.NoError(t, err)
 
 	// Use an alias on the second entry so Helm validation passes (different
@@ -509,7 +362,7 @@ dependencies:
     version: 0.1.0
     repository: file://../subchart
     alias: subchart-dup
-`), utils.ReadWrite)
+`), 0o644)
 	require.NoError(t, err)
 
 	cacheDir := t.TempDir()
@@ -535,181 +388,4 @@ dependencies:
 	// The duplicate (alias "subchart-dup") should have been removed by dedup,
 	// so only one entry should exist in the values map.
 	assert.Len(t, vals, 1, "dedup should have removed the duplicate dependency")
-}
-
-func TestStaleDependenciesForceUpdate(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
-apiVersion: v2
-name: test-chart
-version: 0.1.0
-dependencies:
-  - name: redis
-    version: 6.0.0
-  - name: nginx
-    version: 1.0.0
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	helmClient := client.Client{
-		Path:               tempDir,
-		Debug:              true,
-		TTL:                time.Now().Add(-10 * time.Minute),
-		UpdateDependencies: true,
-	}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	staleDeps := helmClient.StaleDependencies()
-	assert.Len(t, staleDeps, 2, "force update should return all dependencies")
-}
-
-func TestLookForArchiveCacheHit(t *testing.T) {
-	tempDir := t.TempDir()
-	cacheDir := t.TempDir()
-	t.Setenv("HELM_CACHE_HOME", cacheDir)
-
-	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
-apiVersion: v2
-name: test-chart
-version: 0.1.0
-dependencies:
-  - name: mylib
-    version: 2.0.0
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	chartsCacheDir := filepath.Join(cacheDir, client.ChartsFolder)
-	err = os.MkdirAll(chartsCacheDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	// Place a fresh archive in the cache (not in charts/)
-	cachedArchive := filepath.Join(chartsCacheDir, "mylib-2.0.0.tgz")
-	err = os.WriteFile(cachedArchive, []byte("cached-content"), utils.ReadWrite)
-	require.NoError(t, err)
-
-	helmClient := client.Client{
-		Path:  tempDir,
-		Debug: true,
-		TTL:   time.Now().Add(-10 * time.Minute),
-	}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	// StaleDependencies should find the archive in cache, copy it to charts/, and return empty
-	staleDeps := helmClient.StaleDependencies()
-	assert.Empty(t, staleDeps, "should not be stale when archive exists in cache")
-
-	// Verify the archive was copied from cache to charts/
-	copiedArchive := filepath.Join(chartsDir, "mylib-2.0.0.tgz")
-	data, err := os.ReadFile(copiedArchive)
-	require.NoError(t, err)
-	assert.Equal(t, "cached-content", string(data))
-}
-
-func TestLookForArchiveCacheExpired(t *testing.T) {
-	tempDir := t.TempDir()
-	cacheDir := t.TempDir()
-	t.Setenv("HELM_CACHE_HOME", cacheDir)
-
-	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
-apiVersion: v2
-name: test-chart
-version: 0.1.0
-dependencies:
-  - name: mylib
-    version: 2.0.0
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	chartsCacheDir := filepath.Join(cacheDir, client.ChartsFolder)
-	err = os.MkdirAll(chartsCacheDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	// Place an expired archive in the cache
-	cachedArchive := filepath.Join(chartsCacheDir, "mylib-2.0.0.tgz")
-	err = os.WriteFile(cachedArchive, []byte("old-content"), utils.ReadWrite)
-	require.NoError(t, err)
-
-	// Set modtime to the past so it's older than the TTL cutoff
-	oldTime := time.Now().Add(-1 * time.Hour)
-	err = os.Chtimes(cachedArchive, oldTime, oldTime)
-	require.NoError(t, err)
-
-	helmClient := client.Client{
-		Path:  tempDir,
-		Debug: true,
-		TTL:   time.Now().Add(-10 * time.Minute), // cutoff = 10 min ago; archive is 1 hour old
-	}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	staleDeps := helmClient.StaleDependencies()
-	require.Len(t, staleDeps, 1, "should be stale when cache is expired")
-	assert.Equal(t, "mylib", staleDeps[0].Name)
-
-	// Verify the expired archive was removed from cache
-	_, err = os.Stat(cachedArchive)
-	assert.True(t, os.IsNotExist(err), "expired cached archive should have been deleted")
-}
-
-func TestPackageLocalDependencyAbsolutePath(t *testing.T) {
-	tempDir := t.TempDir()
-	cacheDir := t.TempDir()
-	t.Setenv("HELM_CACHE_HOME", cacheDir)
-
-	// Create subchart at an absolute path
-	subDir := filepath.Join(tempDir, "absolute-sub")
-	err := os.MkdirAll(subDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(subDir, "Chart.yaml"), []byte(`apiVersion: v2
-name: absolute-sub
-version: 0.3.0
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(subDir, "values.yaml"), []byte("key: val\n"), utils.ReadWrite)
-	require.NoError(t, err)
-
-	// Parent chart using absolute file:// path
-	parentDir := filepath.Join(tempDir, "parent")
-	err = os.MkdirAll(parentDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(parentDir, "Chart.yaml"), fmt.Appendf(nil, `apiVersion: v2
-name: parent
-version: 0.1.0
-dependencies:
-  - name: absolute-sub
-    version: 0.3.0
-    repository: file://%s
-`, subDir), utils.ReadWrite)
-	require.NoError(t, err)
-
-	chartsDir := filepath.Join(parentDir, client.ChartsFolder)
-	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	helmClient := client.Client{Path: parentDir, Debug: true}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	err = helmClient.UpdateDeps(helmClient.Chart.Metadata.Dependencies)
-	require.NoError(t, err)
-
-	archive := filepath.Join(chartsDir, "absolute-sub-0.3.0.tgz")
-	_, err = os.Stat(archive)
-	require.NoError(t, err, "archive should exist after packaging with absolute path")
 }

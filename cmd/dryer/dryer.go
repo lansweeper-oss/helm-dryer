@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
-	"github.com/lansweeper-oss/helm-dryer/internal/cli"
-	"github.com/lansweeper-oss/helm-dryer/internal/dryer"
+	"github.com/lansweeper/helm-dryer/internal/cli"
+	"github.com/lansweeper/helm-dryer/internal/dryer"
 )
 
 //nolint:gochecknoglobals

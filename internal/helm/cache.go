@@ -6,8 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/utils"
-	"helm.sh/helm/v3/pkg/chart"
+	"github.com/lansweeper/helm-dryer/internal/utils"
 )
 
 const (
@@ -16,21 +15,21 @@ const (
 
 // EnsureCacheDirs ensures that the Helm cache directories exists.
 func EnsureCacheDirs(path string) error {
-	chartDependenciesDir := filepath.Join(path, ChartsFolder)
+	chartDependenciesDir := filepath.Join(path, "charts")
 	cacheDir := getCacheDir()
 	chartsCacheDir := getChartsCacheDir()
 
-	err := os.MkdirAll(chartDependenciesDir, utils.ReadWriteDir)
+	err := utils.EnsureDirExists(chartDependenciesDir, utils.ReadWrite)
 	if err != nil {
 		return fmt.Errorf("failed to ensure chart dependencies directory %s exists: %w", chartDependenciesDir, err)
 	}
 
-	err = os.MkdirAll(cacheDir, utils.ReadWriteDir)
+	err = utils.EnsureDirExists(cacheDir, utils.ReadWrite)
 	if err != nil {
 		return fmt.Errorf("failed to ensure cache directory %s exists: %w", cacheDir, err)
 	}
 
-	err = os.MkdirAll(chartsCacheDir, utils.ReadWriteDir)
+	err = utils.EnsureDirExists(chartsCacheDir, utils.ReadWrite)
 	if err != nil {
 		return fmt.Errorf("failed to ensure charts cache directory %s exists: %w", chartsCacheDir, err)
 	}
@@ -49,16 +48,16 @@ func getCacheDir() string {
 }
 
 func getChartsCacheDir() string {
-	return filepath.Join(getCacheDir(), ChartsFolder)
+	return filepath.Join(getCacheDir(), "charts")
 }
 
 // CacheDependencies copies the chart tgz files to the cache directory.
-func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
-	dir := filepath.Join(h.Path, ChartsFolder)
-	cacheDir := getChartsCacheDir()
+func (h *Client) CacheDependencies() error {
+	dir := filepath.Join(h.Path, "charts")
+	cacheDir := filepath.Join(getCacheDir(), "charts")
 
-	for _, dependency := range dependencies {
-		archivedChart := GetArchiveName(dependency.Name, dependency.Version)
+	for _, dependency := range h.Chart.Dependencies() {
+		archivedChart := fmt.Sprintf("%s-%s.tgz", dependency.Metadata.Name, dependency.Metadata.Version)
 
 		slog.Debug("Storing chart " + archivedChart)
 		sourcePath := filepath.Join(dir, archivedChart)
@@ -81,9 +80,9 @@ func (h *Client) lookForArchive(name string, version string) bool {
 		return false
 	}
 
-	dir := filepath.Join(h.Path, ChartsFolder)
+	dir := filepath.Join(h.Path, "charts")
 	chartsCacheDir := getChartsCacheDir()
-	archive := GetArchiveName(name, version)
+	archive := fmt.Sprintf("%s-%s.tgz", name, version)
 	dependencyArchive := filepath.Join(dir, archive)
 	cachedDependency := filepath.Join(chartsCacheDir, archive)
 

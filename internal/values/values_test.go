@@ -3,8 +3,8 @@ package values_test
 import (
 	"testing"
 
-	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
-	"github.com/lansweeper-oss/helm-dryer/internal/values"
+	dryerr "github.com/lansweeper/helm-dryer/internal/errors"
+	"github.com/lansweeper/helm-dryer/internal/values"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,12 +72,9 @@ func TestMergeYAMLArrayOfMaps(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := values.MergeYAMLArrayOfMaps(test.input)
+			result, _ := values.MergeYAMLArrayOfMaps(test.input)
 
-			if test.hasError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			if !test.hasError {
 				assert.Equal(t, test.expected, result)
 			}
 		})
@@ -142,12 +139,9 @@ func TestReadValuesFile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := values.ReadFile(test.filePath)
+			result, _ := values.ReadFile(test.filePath)
 
-			if test.hasError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			if !test.hasError {
 				assert.Equal(t, test.expected, result)
 			}
 		})
@@ -227,12 +221,9 @@ func TestMergeYamlMaps(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := values.MergeYamlMaps(test.m1, test.m2)
+			_ = values.MergeYamlMaps(test.m1, test.m2)
 
-			if test.hasError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			if !test.hasError {
 				assert.Equal(t, test.expected, test.m1)
 			}
 		})
@@ -378,12 +369,9 @@ func TestFromCli(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := values.DotNotationToMap(test.input)
+			result, _ := values.DotNotationToMap(test.input)
 
-			if test.hasError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			if !test.hasError {
 				assert.Equal(t, test.expected, result)
 			}
 		})

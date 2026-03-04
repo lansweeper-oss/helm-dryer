@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"strings"
 
-	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
-	"github.com/lansweeper-oss/helm-dryer/internal/utils"
+	client "github.com/lansweeper/helm-dryer/internal/helm"
+	"github.com/lansweeper/helm-dryer/internal/utils"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -69,12 +69,12 @@ func (in *Input) TemplateChart() error {
 func (in *Input) renderChart(vals map[string]any) error {
 	folderOutput := in.UsingFolderAsOutput()
 
-	chartLoader, err := loader.Loader(in.Settings.Path)
+	loader, err := loader.Loader(in.Settings.Path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chart loader: %w", err)
 	}
 
-	chart, err := chartLoader.Load()
+	chart, err := loader.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load Chart: %w", err)
 	}
@@ -200,6 +200,7 @@ func (in *Input) templateYAMLFile(
 
 	templateOptions := client.Options{
 		DelimLeft:       in.Settings.DelimLeft,
+		PassPending:     in.Settings.TwoPass,
 		DelimRight:      in.Settings.DelimRight,
 		TemplateOptions: option,
 	}

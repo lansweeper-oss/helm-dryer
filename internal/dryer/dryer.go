@@ -10,12 +10,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/argo"
-	"github.com/lansweeper-oss/helm-dryer/internal/cli"
-	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
-	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
-	"github.com/lansweeper-oss/helm-dryer/internal/utils"
-	"github.com/lansweeper-oss/helm-dryer/internal/values"
+	"github.com/lansweeper/helm-dryer/internal/argo"
+	"github.com/lansweeper/helm-dryer/internal/cli"
+	dryerr "github.com/lansweeper/helm-dryer/internal/errors"
+	client "github.com/lansweeper/helm-dryer/internal/helm"
+	"github.com/lansweeper/helm-dryer/internal/utils"
+	"github.com/lansweeper/helm-dryer/internal/values"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -91,10 +91,6 @@ func (in *Input) TemplateValues() error {
 			Path:               in.Settings.Path,
 			TTL:                utils.GetTTL(in.Settings.TTL),
 			UpdateDependencies: in.Settings.UpdateDependencies,
-		}
-
-		if err != nil {
-			slog.Warn("Unexpected error checking Chart.yaml", "path", chartFilePath, "error", err)
 		}
 
 		vals, err = helmClient.ReadChartDependencies()
@@ -185,8 +181,6 @@ func (in *Input) processValuesFiles(
 			}
 
 			return nil, fmt.Errorf("%w: %s", os.ErrNotExist, file)
-		} else if err != nil {
-			return nil, fmt.Errorf("failed to stat values file %s: %w", file, err)
 		}
 
 		slog.Debug("Reading values file: " + fileWithPath)
