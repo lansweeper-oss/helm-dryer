@@ -1,4 +1,6 @@
-# helm-dryer ![Coverage](coverage.svg)
+<!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
+
+# helm-dryer ![Coverage](coverage.svg) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -6,6 +8,33 @@ files really DRY.
 <p align="center">
   <img src="dryer.png" alt="Helm DRYer" style="max-height:20rem" />
 </p>
+
+## Installation
+
+### Binary
+
+Download the latest release from [GitHub Releases](https://github.com/lansweeper-oss/helm-dryer/releases).
+Pre-built binaries are available for Linux and macOS (amd64/arm64):
+
+```shell
+# Download and extract (replace OS and ARCH as needed)
+curl -sL https://github.com/lansweeper-oss/helm-dryer/releases/latest/download/dryer-linux-amd64.tar.gz | tar xz
+sudo mv dryer /usr/local/bin/
+```
+
+### Go install
+
+```shell
+go install github.com/lansweeper-oss/helm-dryer@latest
+```
+
+### OCI image (for ArgoCD)
+
+The plugin is published as an OCI image for use as an ArgoCD CMP sidecar (see [ArgoCD integration](#argocd-integration)):
+
+```text
+ghcr.io/lansweeper-oss/helm-dryer/helm-dryer:<version>
+```
 
 ## Rationale
 
@@ -41,7 +70,7 @@ While this would be possible instead, given we inject the values referenced belo
 arguments (similarly to `helm --set` key-value pairs):
 
 ```yaml
-{{- $storageName: "s3" }} # we can also define variables :-)
+{{- $storageName := "s3" }} # we can also define variables :-)
 configuration:
   clusterName: {{ .Values.clusterName }}
   storage:
@@ -132,7 +161,7 @@ spec:
 ```
 
 Besides that, for CI or troubleshooting purposes, this plugin can be run manually as a regular CLI
-that accepts three commands:
+that accepts these commands:
 
 - `get`: used to get the merged+templated values.
 - `template`: used to template a given Helm chart with merged values.
@@ -374,7 +403,7 @@ Flags:
   -H, --disable-hooks              Disable Helm hooks.
 ```
 
-The following keys are expected under `ARGO_APP_PARAMETERS`:
+The following keys are expected under `ARGOCD_APP_PARAMETERS`:
 
 - `valueFiles`, a list of files containing values. If a file is missing, it will produce an error if
   the `ignoreMissing` flag is not enabled. No assumptions are made, and an explicit entry for
@@ -490,7 +519,7 @@ supported:
 - `releaseNamespace` - Override the release namespace, otherwise environment variable
   `ARGOCD_APP_NAMESPACE` or Application's `spec.destination.namespace` (in that order of precedence)
   is used.
-- `ttl` - Per-app control of the chart dependency archives TTL.
+- `ttl` - Per-app control of the chart dependency archives TTL (Go `time.Duration` format, e.g. `"5m"`, `"1h"`).
 - `twoPass` - Experimental (see below) feature to do a 2-pass render of the values.
 
 These settings can be customized per-application and override the global (CLI argument) ones.
@@ -672,7 +701,7 @@ repoServer:
   extraContainers:
   - name: dryer-plugin
     command: [/var/run/argocd/argocd-cmp-server]
-    image: ghcr.io/lansweeper/helm-dryer/helm-dryer:v1.0.0
+    image: ghcr.io/lansweeper-oss/helm-dryer/helm-dryer:v1.0.0
     env:
       - name: HELM_CACHE_HOME
         value: /helm-working-dir
@@ -751,5 +780,5 @@ go test ./... -cover
 [Builtin objects]: https://helm.sh/docs/chart_template_guide/builtin_objects/
 [CMP Implementation]: https://argo-cd.readthedocs.io/en/stable/proposals/parameterized-config-management-plugins/#implementation-detailsnotesconstraints
 [Kubernetes and Chart functions]: https://helm.sh/docs/chart_template_guide/function_list/#kubernetes-and-chart-functions
-[Sprig]: (http://masterminds.github.io/sprig/)
+[Sprig]: http://masterminds.github.io/sprig/
 [YAML anchors]: https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases
