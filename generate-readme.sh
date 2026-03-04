@@ -51,7 +51,12 @@ while IFS= read -r line; do
     fi
 done < "${TEMPLATE_FILE}" > "${TEMP_FILE}"
 
-# Move the temporary file to the final output
-mv "${TEMP_FILE}" "${OUTPUT_FILE}"
+# Prepend auto-generated notice and move the temporary file to the final output
+{
+  echo "<!-- DO NOT EDIT: This file is auto-generated from ${TEMPLATE_FILE} by $(basename "$0"). -->"
+  echo ""
+  cat "${TEMP_FILE}"
+} > "${OUTPUT_FILE}"
+rm -f "${TEMP_FILE}"
 
 echo "Successfully generated ${OUTPUT_FILE}"

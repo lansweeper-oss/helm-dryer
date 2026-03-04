@@ -15,10 +15,22 @@ const (
 )
 
 // EnsureCacheDirs ensures that the Helm cache directories exists.
+// It also sets HELM_CACHE_HOME if unset, so the Helm SDK (e.g. helmpath.CachePath)
+// resolves repository index paths to the same writable directory.
 func EnsureCacheDirs(path string) error {
 	chartDependenciesDir := filepath.Join(path, ChartsFolder)
 	cacheDir := getCacheDir()
 	chartsCacheDir := getChartsCacheDir()
+
+	if os.Getenv(Cache) == "" {
+		err := os.Setenv(Cache, cacheDir)
+		if err != nil {
+			slog.Warn(
+				"Helm cache directory falls back to /.cache, ensure this is writable or set HELM_CACHE_HOME",
+				"cacheDir", cacheDir, "err", err,
+			)
+		}
+	}
 
 	err := os.MkdirAll(chartDependenciesDir, utils.ReadWriteDir)
 	if err != nil {
