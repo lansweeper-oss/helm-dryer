@@ -20,21 +20,21 @@ that addresses specific use cases.
 Before contributing, please take time to understand the project structure, existing codebase,
 and our development practices. We recommend:
 
-- Reading through the existing documentation and README
-- Exploring the codebase to understand the current architecture
-- Reviewing open issues and pull requests to understand ongoing work
-- Setting up the development environment as described in our setup guide
+- Reading through the existing documentation and README.
+- Exploring the codebase to understand the current architecture.
+- Reviewing open issues and pull requests to understand ongoing work.
+- Setting up the pre-commit hooks.
 
 ## Types of Contributions
 
 We welcome various types of contributions:
 
-- **Bug Reports**: Help us identify and fix issues
-- **Feature Requests**: Suggest new functionality that aligns with our project goals
-- **Documentation**: Improve existing docs or add missing documentation
-- **Code Contributions**: Submit bug fixes, performance improvements, or new features
-- **Testing**: Add test cases or improve test coverage
-- **Community Support**: Help other users in discussions and issues
+- **Bug Reports**: Help us identify and fix issues.
+- **Feature Requests**: Suggest new functionality that aligns with our project goals.
+- **Documentation**: Improve existing docs or add missing documentation.
+- **Code Contributions**: Submit bug fixes, performance improvements, or new features.
+- **Testing**: Add test cases or improve test coverage.
+- **Community Support**: Help other users in discussions and issues.
 
 ## Contribution Guidelines and Requirements
 
@@ -42,10 +42,10 @@ We welcome various types of contributions:
 
 Please ensure your contribution meets these requirements:
 
-- **Code Quality**: All code must pass existing linting rules and maintain consistent style
-- **Testing**: Every pull request must include appropriate tests and pass all existing test suites
-- **Documentation**: Update relevant documentation when adding features or changing behavior
-- **Backward Compatibility**: Avoid breaking changes unless absolutely necessary and properly documented
+- **Code Quality**: All code must pass existing linting rules and maintain consistent style.
+- **Testing**: Every pull request must include appropriate tests and pass all existing test suites.
+- **Documentation**: Update relevant documentation when adding features or changing behavior.
+- **Backward Compatibility**: Avoid breaking changes unless absolutely necessary and properly documented.
 
 ### For New Features
 

@@ -153,6 +153,9 @@ func (in *Input) compoundValues(initialValues map[string]any) (map[string]any, e
 	}
 
 	if in.Settings.TwoPass {
+		// NOTE: TwoPass is set to false to prevent infinite recursion and to switch the second pass
+		// to missingkey=error mode (via templateYAMLFile). This permanently mutates the Input, which
+		// is acceptable because TwoPass is consumed exactly once per TemplateValues/TemplateChart call.
 		in.Settings.TwoPass = false
 		// merge again over the initial values to ensure they are not lost
 		err = values.MergeYamlMaps(vals, processed)

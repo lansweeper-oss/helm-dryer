@@ -58,35 +58,23 @@ var (
 	}
 )
 
-func cleanup(in *dryer.Input) {
-	os.Remove(in.Settings.Out)
-	os.RemoveAll(in.Settings.Path)
-}
+func setupTest(t *testing.T, testFiles []string) *dryer.Input {
+	t.Helper()
 
-func setupTest(testFiles []string) (*dryer.Input, error) {
 	setup := &dryer.Input{}
 	setup.Data.Files = testFiles
 
-	tmpfile, err := os.CreateTemp("", "test-*.yaml")
-	if err != nil {
-		return nil, fmt.Errorf("error creating temp file: %w", err)
-	}
+	tmpfile, err := os.CreateTemp(t.TempDir(), "test-*.yaml")
+	require.NoError(t, err, "error creating temp file")
 
 	setup.Settings.Out = tmpfile.Name()
+	tmpfile.Close()
 
-	defer tmpfile.Close()
-
-	tmpDir, err := os.MkdirTemp("", "testdata-")
-	if err != nil {
-		return nil, fmt.Errorf("error creating temp directory: %w", err)
-	}
-
+	tmpDir := t.TempDir()
 	setup.Settings.Path = tmpDir
 
 	err = os.CopyFS(tmpDir, os.DirFS(testFolder))
-	if err != nil {
-		return nil, fmt.Errorf("error copying test data: %w", err)
-	}
+	require.NoError(t, err, "error copying test data")
 
 	setup.Data.ReleaseName = os.Getenv("ARGOCD_APP_NAME")
 
@@ -109,24 +97,18 @@ func setupTest(testFiles []string) (*dryer.Input, error) {
 	}
 
 	setup.Settings.UpdateDependencies = false
-	// setup.Settings.TTL = "0"
 	setup.Settings.Logging.Debug = true
 	setup.Settings.Logging.Format = "text"
 
-	return setup, nil
+	return setup
 }
 
 func TestTemplateValues(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
+	test := setupTest(t, testFiles)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = test.TemplateValues()
+	err := test.TemplateValues()
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -161,16 +143,12 @@ func TestTemplateValues(t *testing.T) {
 func TestTemplateWithCustomDelims(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFilesWithCustomDelims)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFilesWithCustomDelims)
 
 	test.Settings.DelimLeft = "<<"
 	test.Settings.DelimRight = ">>"
-	err = test.TemplateValues()
+
+	err := test.TemplateValues()
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -205,14 +183,9 @@ func TestTemplateWithCustomDelims(t *testing.T) {
 func TestTemplateCapabilities(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFilesWithCapabilities)
-	defer cleanup(test)
+	test := setupTest(t, testFilesWithCapabilities)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = test.TemplateValues()
+	err := test.TemplateValues()
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -231,15 +204,11 @@ func TestTemplateCapabilities(t *testing.T) {
 func Test2PassTemplateValues(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFilesTwoPass)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFilesTwoPass)
 
 	test.Settings.TwoPass = true
-	err = test.TemplateValues()
+
+	err := test.TemplateValues()
 	require.NoError(t, err, "TemplateValues` should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -258,16 +227,12 @@ func Test2PassTemplateValues(t *testing.T) {
 func TestTemplateChart(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	test.Data.Set["tags.foobar"] = "true"
 	test.Settings.SkipCRDs = true
-	err = test.TemplateChart()
+
+	err := test.TemplateChart()
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -302,14 +267,9 @@ func TestTemplateChart(t *testing.T) {
 func TestSkipSchema(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFilesInvalidSchema)
-	defer cleanup(test)
+	test := setupTest(t, testFilesInvalidSchema)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = test.TemplateChart()
+	err := test.TemplateChart()
 	require.Error(t, err, "TemplateChart should return an error when SkipSchemaValidation=False")
 
 	test.Settings.SkipSchemaValidation = true
@@ -320,17 +280,12 @@ func TestSkipSchema(t *testing.T) {
 func TestSkipTestHooks(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	test.Data.Set["tags.hello"] = "true"
 	test.Settings.SkipTests = true
 
-	err = test.TemplateChart()
+	err := test.TemplateChart()
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -365,14 +320,9 @@ func TestSkipTestHooks(t *testing.T) {
 func TestNullRemovesKeys(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
+	test := setupTest(t, testFiles)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = test.TemplateValues()
+	err := test.TemplateValues()
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	merged, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -428,16 +378,11 @@ func TestNullRemovesKeys(t *testing.T) {
 func TestIgnoreMainValues(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	test.Data.Set["tags.hello"] = "true"
 
-	err = test.TemplateChart()
+	err := test.TemplateChart()
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	// Preserve the null values (that is, we omit values.yaml implicitly load while keeping it from Data.Files)
@@ -450,17 +395,12 @@ func TestIgnoreMainValues(t *testing.T) {
 func TestUsingFolderAsOutput(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	test.Data.Set["tags.hello"] = "true"
 	test.Settings.Out = t.TempDir()
 
-	err = test.TemplateChart()
+	err := test.TemplateChart()
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	files, err := os.ReadDir(filepath.Join(test.Settings.Out, "test-chart", "charts", "hello-world", "templates"))
@@ -482,12 +422,7 @@ func TestRenderChartAsCMP(t *testing.T) {
 	t.Setenv("ARGOCD_APP_NAME", releaseName)
 	t.Setenv("ARGOCD_APP_NAMESPACE", releaseNamespace)
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	test.Data.Set["tags.hello"] = "true"
 
@@ -509,7 +444,7 @@ func TestRenderChartAsCMP(t *testing.T) {
 		]`,
 	)
 
-	err = test.RenderChart()
+	err := test.RenderChart()
 	require.NoError(t, err, "RenderChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -559,12 +494,7 @@ func TestRenderChartAsCMP(t *testing.T) {
 }
 
 func TestTwoPassRenderChartAsCMP(t *testing.T) {
-	test, err := setupTest(testFilesTwoPass)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFilesTwoPass)
 
 	test.Data.Set["tags.foobar"] = "true"
 	test.Settings.IgnoreMainValues = true
@@ -594,7 +524,7 @@ func TestTwoPassRenderChartAsCMP(t *testing.T) {
 		]`,
 	)
 
-	err = test.RenderChart()
+	err := test.RenderChart()
 	require.NoError(t, err, "RenderChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -628,12 +558,7 @@ func TestTwoPassRenderChartAsCMP(t *testing.T) {
 
 func TestTwoPassWithDependencies(t *testing.T) {
 	// This time instruct this is a 2-pass render from the input settings.
-	test, err := setupTest(testFilesTwoPass)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFilesTwoPass)
 
 	test.Data.Set["tags.hello"] = "true"
 	test.Settings.IgnoreMainValues = true
@@ -664,7 +589,7 @@ func TestTwoPassWithDependencies(t *testing.T) {
 		]`,
 	)
 
-	err = test.RenderChart()
+	err := test.RenderChart()
 	require.NoError(t, err, "RenderChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -715,13 +640,7 @@ func TestRenderFromApp(t *testing.T) {
 	releaseName := "overridden-release-name"
 	releaseNamespace := "test"
 
-	test, err := setupTest(testFiles)
-
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	// Create a temporary ArgoCD Application spec file
 	appSpec := `
@@ -836,17 +755,12 @@ spec:
 func TestSetOverridesFiles(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	test.Data.Set["foo-bar.logLevel"] = "debug"
 	test.Data.Set["foo-bar.serviceMonitor.enabled"] = "false"
 
-	err = test.TemplateValues()
+	err := test.TemplateValues()
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -872,12 +786,7 @@ func TestSetOverridesFiles(t *testing.T) {
 func TestIncorrectOutputFallback(t *testing.T) {
 	t.Parallel()
 
-	test, err := setupTest(testFiles)
-	defer cleanup(test)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := setupTest(t, testFiles)
 
 	test.Settings.Out = "/non/existing/folder"
 	assert.False(t, test.UsingFolderAsOutput(), "UsingFolderAsOutput should return false for a non-existing folder")

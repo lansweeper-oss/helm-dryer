@@ -44,11 +44,6 @@ type Options struct {
 	TemplateOptions string
 }
 
-// dependencyKey returns a unique key for deduplication.
-func dependencyKey(dep *chart.Dependency) string {
-	return dep.Name + "|" + dep.Version + "|" + dep.Repository
-}
-
 // TemplateAndParseYaml reads a YAML file, applies a template to it, and returns the resulting data as a map.
 func TemplateAndParseYaml(
 	file string, options Options,
@@ -68,6 +63,10 @@ func TemplateAndParseYaml(
 	}
 
 	// Add Values key to the runtime map, so we end up with what Helm expects.
+	// NOTE: this mutates the caller's runtime map. This is intentional: processValuesFiles passes
+	// the same runtimeValues reference for every file, and the merge is idempotent (same key/value
+	// each time). Creating a copy per call would be safer but adds allocation overhead for no
+	// observable benefit given the current call sites.
 	err = values.MergeYamlMaps(
 		runtime,
 		map[string]any{
@@ -230,10 +229,7 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 		return fmt.Errorf("failed to create chart downloader: %w", err)
 	}
 
-	settings := helmCli.EnvSettings{
-		Debug:           h.Debug,
-		RepositoryCache: getCacheDir(),
-	}
+	settings := h.envSettings()
 
 	for _, dep := range dependencies {
 		switch {
@@ -275,12 +271,7 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 
 // chartDownloader sets up the proper credentials and cache settings.
 func (h *Client) chartDownloader() (*downloader.ChartDownloader, error) {
-	cacheDir := getCacheDir()
-
-	settings := helmCli.EnvSettings{
-		Debug:           h.Debug,
-		RepositoryCache: cacheDir,
-	}
+	settings := h.envSettings()
 
 	registryClient, err := h.registryClient()
 	if err != nil {
@@ -290,10 +281,15 @@ func (h *Client) chartDownloader() (*downloader.ChartDownloader, error) {
 	return &downloader.ChartDownloader{
 		Out:             os.Stderr,
 		Verify:          downloader.VerifyNever,
-		RepositoryCache: cacheDir,
+		RepositoryCache: settings.RepositoryCache,
 		RegistryClient:  registryClient,
 		Getters:         getter.All(&settings),
 	}, nil
+}
+
+// dependencyKey returns a unique key for deduplication.
+func dependencyKey(dep *chart.Dependency) string {
+	return dep.Name + "|" + dep.Version + "|" + dep.Repository
 }
 
 // deduplicateDependencies remove duplicates from the dependencies list.
@@ -315,6 +311,14 @@ func (h *Client) deduplicateDependencies() {
 	}
 
 	h.Chart.Metadata.Dependencies = dependencies
+}
+
+// envSettings returns a configured Helm EnvSettings instance.
+func (h *Client) envSettings() helmCli.EnvSettings {
+	return helmCli.EnvSettings{
+		Debug:           h.Debug,
+		RepositoryCache: getCacheDir(),
+	}
 }
 
 // packageLocalDependency packages a local dependency into the charts directory.

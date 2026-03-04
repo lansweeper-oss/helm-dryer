@@ -3,7 +3,9 @@ package utils
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -69,7 +71,7 @@ func CopyFile(src, dst string) error {
 		return fmt.Errorf("failed to read file %s: %w", src, err)
 	}
 
-	err = os.WriteFile(dst, data, ReadWriteDir)
+	err = os.WriteFile(dst, data, ReadWrite)
 	if err != nil {
 		return fmt.Errorf("failed to write destination file %s: %w", dst, err)
 	}
@@ -191,12 +193,17 @@ func ParseYAMLFile(file string) (map[string]any, error) {
 }
 
 // ParseYAML reads a YAML string and unmarshals it into a map[string]any map.
+// An empty or whitespace-only input returns an empty map.
 func ParseYAML(content []byte) (map[string]any, error) {
 	yamlFile := bytes.NewReader(content)
 	decoder := yaml.NewDecoder(yamlFile)
 	decoded := make(map[string]any)
 
 	err := decoder.Decode(&decoded)
+	if errors.Is(err, io.EOF) {
+		return decoded, nil
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("error parsing YAML file: %w", err)
 	}

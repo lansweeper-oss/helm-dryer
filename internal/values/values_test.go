@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
+	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/lansweeper-oss/helm-dryer/internal/values"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -121,7 +122,7 @@ func TestReadValuesFile(t *testing.T) {
 		{
 			name:     "Empty YAML file",
 			filePath: "testdata/empty.yaml",
-			expected: nil,
+			expected: map[string]any{},
 			hasError: false,
 		},
 		{
@@ -142,7 +143,7 @@ func TestReadValuesFile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := values.ReadFile(test.filePath)
+			result, err := utils.ParseYAMLFile(test.filePath)
 
 			if test.hasError {
 				require.Error(t, err)
