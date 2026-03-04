@@ -23,7 +23,13 @@ func EnsureCacheDirs(path string) error {
 	chartsCacheDir := getChartsCacheDir()
 
 	if os.Getenv(Cache) == "" {
-		os.Setenv(Cache, cacheDir)
+		err := os.Setenv(Cache, cacheDir)
+		if err != nil {
+			slog.Warn(
+				"Helm cache directory falls back to /.cache, ensure this is writable or set HELM_CACHE_HOME",
+				"cacheDir", cacheDir, "err", err,
+			)
+		}
 	}
 
 	err := os.MkdirAll(chartDependenciesDir, utils.ReadWriteDir)
