@@ -99,17 +99,15 @@ func (c *CLI) Run(ctx *kong.Context) error {
 }
 
 func initLogger(debug bool, format string) {
-	lvl := new(slog.LevelVar)
+	var level slog.Level
 	if debug {
-		lvl.Set(slog.LevelDebug)
-	} else {
-		lvl.Set(slog.LevelInfo)
+		level = slog.LevelDebug
 	}
 
 	var handler slog.Handler
 
 	loggerOptions := &slog.HandlerOptions{
-		Level: lvl,
+		Level: level,
 	}
 
 	if format == "console" {

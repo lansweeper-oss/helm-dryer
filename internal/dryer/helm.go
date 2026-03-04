@@ -3,6 +3,7 @@ package dryer
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
@@ -167,25 +168,9 @@ func (in *Input) buildHelmClient(folderOutput bool) (*action.Install, error) {
 // Remove resources containing "helm.sh/hook: test".
 // These are stored as Hooks inside the release instead as Manifests.
 func (in *Input) skipTestResources(rel *release.Release) {
-	cleanedHooks := []*release.Hook{}
-
-	for _, hook := range rel.Hooks {
-		keep := true
-
-		for _, event := range hook.Events {
-			if string(event) == "test" {
-				keep = false
-
-				break
-			}
-		}
-
-		if keep {
-			cleanedHooks = append(cleanedHooks, hook)
-		}
-	}
-
-	rel.Hooks = cleanedHooks
+	rel.Hooks = slices.DeleteFunc(rel.Hooks, func(hook *release.Hook) bool {
+		return slices.Contains(hook.Events, release.HookTest)
+	})
 }
 
 func (in *Input) templateYAMLFile(

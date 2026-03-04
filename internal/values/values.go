@@ -3,32 +3,11 @@ package values
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"dario.cat/mergo"
 	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
-	"go.yaml.in/yaml/v3"
 )
-
-// ReadFile reads a YAML file and unmarshals it into a map[string]any.
-// It returns an error if the file cannot be read or if the YAML cannot be unmarshaled.
-func ReadFile(path string) (map[string]any, error) {
-	data, err := os.ReadFile(filepath.Clean(path))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
-	}
-
-	var values map[string]any
-
-	err = yaml.Unmarshal(data, &values)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal YAML from file %s: %w", path, err)
-	}
-
-	return values, nil
-}
 
 // MergeYamlMaps merges two Values maps deeply from left to right.
 func MergeYamlMaps(m1 map[string]any, m2 map[string]any) error {
