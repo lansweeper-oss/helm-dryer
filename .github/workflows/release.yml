@@ -86,7 +86,7 @@ jobs:
     -
       name: Build binaries
       id: build-binaries
-      if: ${{ steps.tag.outputs.tag != '' && github.event_name != 'workflow_dispatch' }}
+      if: ${{ steps.tag.outputs.tag != '' }}
       run: |-
         CMD="github.com/lansweeper-oss/helm-dryer/cmd/dryer"
         NOW=$(date +'%Y-%m-%dT%H:%M:%S')
@@ -101,7 +101,7 @@ jobs:
         done
     -
       name: Create a GitHub release
-      if: ${{ steps.tag.outputs.tag != '' && github.event_name != 'workflow_dispatch' }}
+      if: ${{ steps.tag.outputs.tag != '' }}
       uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
       with:
         tag_name: ${{ steps.tag.outputs.tag }}
