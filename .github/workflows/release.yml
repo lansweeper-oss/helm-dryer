@@ -105,7 +105,7 @@ jobs:
       uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
       with:
         tag_name: ${{ steps.tag.outputs.tag }}
-        name: Release ${{ steps.tag.outputs.tag }}
+        name: ${{ steps.tag.outputs.tag }}
         body: ${{ steps.tag-from-git.outputs.changelog }}
         files: |
           /tmp/dryer-linux-amd64.tar.gz
