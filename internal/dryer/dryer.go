@@ -25,7 +25,7 @@ type Input struct {
 	Settings    cli.Settings
 }
 
-var kubeVersionPattern = regexp.MustCompile(`^\d+\.\d+(\..+)?$`)
+var kubeVersionPattern = regexp.MustCompile(`^v?\d+\.\d+(\..+)?$`)
 
 // RenderFromApp renders an application taking the input values from an ArgoCD Application file.
 // Values preference is a bit different from the other commands:
@@ -224,7 +224,7 @@ func (in *Input) runtimeValues() (map[string]any, error) {
 			return nil, fmt.Errorf("%w: %s", dryerr.ErrInvalidKubeVersionFormat, in.Data.KubeVersion)
 		}
 
-		kubeVersion := strings.Split(in.Data.KubeVersion, ".")
+		kubeVersion := strings.Split(strings.TrimPrefix(in.Data.KubeVersion, "v"), ".")
 		major = kubeVersion[0]
 		minor = kubeVersion[1]
 	}
