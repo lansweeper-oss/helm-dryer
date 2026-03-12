@@ -167,15 +167,26 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 			return nil, fmt.Errorf("could not update dependencies: %w", err)
 		}
 
-		err = h.CacheDependencies(dependenciesToUpdate)
-		if err != nil {
-			return nil, fmt.Errorf("could not store chart dependencies: %w", err)
-		}
-
-		// Reload the chart so that Dependencies() reflects the newly downloaded archives.
+		// Reload the chart so that Dependencies() reflects the newly downloaded archives
+		// with their actual resolved versions (not the constraint strings from Chart.yaml).
 		h.Chart, err = loader.LoadDir(h.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to reload chart after dependency update: %w", err)
+		}
+
+		// Build cache deps from loaded sub-charts to get resolved versions (e.g. "0.0.9"
+		// instead of the constraint "~0.0.9" that was in Chart.Metadata.Dependencies).
+		cacheDeps := make([]*chart.Dependency, 0, len(h.Chart.Dependencies()))
+		for _, c := range h.Chart.Dependencies() {
+			cacheDeps = append(cacheDeps, &chart.Dependency{
+				Name:    c.Metadata.Name,
+				Version: c.Metadata.Version,
+			})
+		}
+
+		err = h.CacheDependencies(cacheDeps)
+		if err != nil {
+			return nil, fmt.Errorf("could not store chart dependencies: %w", err)
 		}
 	}
 
