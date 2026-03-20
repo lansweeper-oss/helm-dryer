@@ -7,10 +7,6 @@ updates:
     open-pull-requests-limit: 10
     allow:
       - dependency-type: direct
-    ignore: # https://github.com/helm/helm/issues/31148
-    - dependency-name: helm.sh/helm/v3
-      versions:
-      - ">=3.18.5"
   - package-ecosystem: "github-actions"
     directory: .github/workflows
     schedule:
