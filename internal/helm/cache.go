@@ -124,21 +124,11 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 		}
 
 		archiveName := GetCanonicalArchiveName(dependency.Name, dependency.Version)
-		canonicalPath := filepath.Join(dir, archiveName)
-
-		// Rename to canonical name in charts/ so future lookups hit the fast os.Stat path.
-		if sourcePath != canonicalPath {
-			err := os.Rename(sourcePath, canonicalPath)
-		if err != nil {
-				return fmt.Errorf("failed to rename %s to %s: %w", filepath.Base(sourcePath), archiveName, err)
-			}
-		}
-
 		cachePath := filepath.Join(cacheDir, archiveName)
 
 		slog.Debug("Storing chart " + archiveName)
 
-		err := utils.CopyFile(canonicalPath, cachePath)
+		err := utils.CopyFile(sourcePath, cachePath)
 		if err != nil {
 			return fmt.Errorf("failed to copy chart %s to cache directory: %w", archiveName, err)
 		}
