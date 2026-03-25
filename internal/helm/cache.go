@@ -128,7 +128,8 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 
 		// Rename to canonical name in charts/ so future lookups hit the fast os.Stat path.
 		if sourcePath != canonicalPath {
-			if err := os.Rename(sourcePath, canonicalPath); err != nil {
+			err := os.Rename(sourcePath, canonicalPath)
+		if err != nil {
 				return fmt.Errorf("failed to rename %s to %s: %w", filepath.Base(sourcePath), archiveName, err)
 			}
 		}
