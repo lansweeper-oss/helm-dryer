@@ -51,8 +51,8 @@ func EnsureCacheDirs(path string) error {
 	return nil
 }
 
-// GetArchiveName returns the name of the archive for a given chart name and version.
-func GetArchiveName(name, version string) string {
+// GetCanonicalArchiveName returns the canonical archive filename for a given chart name and version.
+func GetCanonicalArchiveName(name, version string) string {
 	return fmt.Sprintf("%s-%s.tgz", name, version)
 }
 
@@ -60,7 +60,7 @@ func GetArchiveName(name, version string) string {
 // it falls back to scanning dir for any .tgz whose embedded Chart metadata matches name and version.
 // Returns the full path to the archive, or "" if not found.
 func resolveArchive(dir, name, version string) string {
-	conventional := filepath.Join(dir, GetArchiveName(name, version))
+	conventional := filepath.Join(dir, GetCanonicalArchiveName(name, version))
 
 	_, err := os.Stat(conventional)
 	if err == nil {
@@ -120,7 +120,7 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 			return fmt.Errorf("failed to find archive for %s-%s in %s", dependency.Name, dependency.Version, dir)
 		}
 
-		archiveName := filepath.Base(sourcePath)
+		archiveName := GetCanonicalArchiveName(dependency.Name, dependency.Version)
 		cachePath := filepath.Join(cacheDir, archiveName)
 
 		slog.Debug("Storing chart " + archiveName)
@@ -165,7 +165,7 @@ func (h *Client) lookForArchive(name string, version string) bool {
 		return false
 	}
 
-	archiveName := filepath.Base(cachedDependency)
+	archiveName := GetCanonicalArchiveName(name, version)
 
 	if cachedStatInfo.ModTime().Before(h.TTL) {
 		slog.Debug("Chart " + archiveName + " found in cache, but TTL is expired")
