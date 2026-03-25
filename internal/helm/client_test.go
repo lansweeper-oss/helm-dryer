@@ -269,7 +269,7 @@ dependencies:
 	_, err = helmClient.ReadChartDependencies()
 	require.NoError(t, err, "ReadChartDependencies should not return an error")
 	// Verify that the gitlab dependency file exists
-	archiveFile := client.GetArchiveName(chartName, chartVersion)
+	archiveFile := client.GetConventionalArchiveName(chartName, chartVersion)
 	dependencyFile := filepath.Join(chartsDir, archiveFile)
 	fileInfo, err := os.Stat(dependencyFile)
 	require.NoError(t, err, archiveFile+" should exist in the charts directory")
