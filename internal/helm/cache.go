@@ -106,19 +106,15 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 	cacheDir := getChartsCacheDir()
 
 	for _, dependency := range dependencies {
-		sourcePath := resolveArchiveName(dir, dependency.Name, dependency.Version)
-		if sourcePath == "" {
-			return fmt.Errorf("failed to find chart archive for %s-%s in %s: %w",
-				dependency.Name, dependency.Version, dir, ErrChartArchiveNotFound)
-		}
+		archivedChart := GetConventionalArchiveName(dependency.Name, dependency.Version)
 
-		cachedChart := GetConventionalArchiveName(dependency.Name, dependency.Version)
-		slog.Debug("Storing chart " + cachedChart)
-		cachePath := filepath.Join(cacheDir, cachedChart)
+		slog.Debug("Storing chart " + archivedChart)
+		sourcePath := filepath.Join(dir, archivedChart)
+		cachePath := filepath.Join(cacheDir, archivedChart)
 
 		err := utils.CopyFile(sourcePath, cachePath)
 		if err != nil {
-			return fmt.Errorf("failed to copy chart %s to cache directory: %w", cachedChart, err)
+			return fmt.Errorf("failed to copy chart %s to cache directory: %w", archivedChart, err)
 		}
 	}
 
@@ -135,9 +131,9 @@ func (h *Client) lookForArchive(name string, version string) bool {
 
 	dir := filepath.Join(h.Path, ChartsFolder)
 	chartsCacheDir := getChartsCacheDir()
-	conventionalArchive := GetConventionalArchiveName(name, version)
-	dependencyArchive := resolveArchiveName(dir, name, version)
-	cachedDependency := filepath.Join(chartsCacheDir, conventionalArchive)
+	archive := GetConventionalArchiveName(name, version)
+	dependencyArchive := filepath.Join(dir, archive)
+	cachedDependency := filepath.Join(chartsCacheDir, archive)
 
 	dependencyStatInfo, err := os.Stat(dependencyArchive)
 
@@ -152,7 +148,7 @@ func (h *Client) lookForArchive(name string, version string) bool {
 	case err != nil:
 		return false
 	case cachedStatInfo.ModTime().Before(h.TTL):
-		slog.Debug("Chart " + conventionalArchive + " found in cache, but TTL is expired")
+		slog.Debug("Chart " + archive + " found in cache, but TTL is expired")
 
 		err = os.Remove(cachedDependency)
 		if err != nil {
@@ -161,18 +157,13 @@ func (h *Client) lookForArchive(name string, version string) bool {
 
 		return false
 	default:
-		// Copy from cache to charts/ using the conventional name
-		target := filepath.Join(dir, conventionalArchive)
-
-		err = utils.CopyFile(cachedDependency, target)
+		err = utils.CopyFile(cachedDependency, dependencyArchive)
 		if err != nil {
-			slog.Warn("failed to copy chart from cache", "archive", conventionalArchive, "dir", dir, "err", err)
+						slog.Warn("failed to copy chart from cache", "archive", archive, "dir", dir, "err", err)
 
 			return false
 		}
 
-		slog.Debug("Chart " + conventionalArchive + " copied from cache")
-	}
-
+		slog.Debug("Chart " + archive + " copied from cache")	}
 	return true
 }

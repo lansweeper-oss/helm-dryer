@@ -384,7 +384,7 @@ dependencies:
 	require.NoError(t, err, "Failed to remove test dependency file")
 
 	err = helmClient.CacheDependencies(loadedDeps)
-	assert.Contains(t, err.Error(), "failed to find chart archive for")
+	assert.Contains(t, err.Error(), fmt.Sprintf("failed to copy chart %s to cache directory", archiveFile))
 
 	// Test case: StoreDeps with no dependencies is a no-op
 	err = helmClient.CacheDependencies(nil)
