@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 )
+
+var errArchiveNotFound = errors.New("failed to find archive")
 
 const (
 	Cache = "HELM_CACHE_HOME"
@@ -79,20 +82,20 @@ func findArchiveByMetadata(dir, name, version string) string {
 	}
 
 	for _, match := range matches {
-		f, err := os.Open(filepath.Clean(match))
+		archiveFile, err := os.Open(filepath.Clean(match))
 		if err != nil {
 			continue
 		}
 
-		ch, err := loader.LoadArchive(f)
+		loadedChart, err := loader.LoadArchive(archiveFile)
 
-		_ = f.Close()
+		_ = archiveFile.Close()
 
 		if err != nil {
 			continue
 		}
 
-		if ch.Metadata.Name == name && ch.Metadata.Version == version {
+		if loadedChart.Metadata.Name == name && loadedChart.Metadata.Version == version {
 			return match
 		}
 	}
@@ -117,7 +120,7 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 	for _, dependency := range dependencies {
 		sourcePath := resolveArchive(dir, dependency.Name, dependency.Version)
 		if sourcePath == "" {
-			return fmt.Errorf("failed to find archive for %s-%s in %s", dependency.Name, dependency.Version, dir)
+			return fmt.Errorf("%w for %s-%s in %s", errArchiveNotFound, dependency.Name, dependency.Version, dir)
 		}
 
 		archiveName := GetCanonicalArchiveName(dependency.Name, dependency.Version)
