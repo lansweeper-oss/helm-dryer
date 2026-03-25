@@ -164,6 +164,8 @@ func (h *Client) lookForArchive(name string, version string) bool {
 			return false
 		}
 
-		slog.Debug("Chart " + archive + " copied from cache")	}
+		slog.Debug("Chart " + archive + " copied from cache")
+	}
+
 	return true
 }
