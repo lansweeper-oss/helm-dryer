@@ -67,7 +67,7 @@ func resolveArchiveName(dir, name, version string) string {
 
 	_, err := os.Stat(conventional)
 	if err == nil {
-		return conventional
+		return GetConventionalArchiveName(name, version)
 	}
 
 	return findArchiveByName(dir, name, version)
@@ -84,7 +84,7 @@ func findArchiveByName(dir, name, version string) string {
 	for _, match := range matches {
 		base := filepath.Base(match)
 		if strings.Contains(base, name) && strings.Contains(base, version) {
-			return match
+			return base
 		}
 	}
 
@@ -106,7 +106,7 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 	cacheDir := getChartsCacheDir()
 
 	for _, dependency := range dependencies {
-		archivedChart := GetConventionalArchiveName(dependency.Name, dependency.Version)
+		archivedChart := resolveArchiveName(dir, dependency.Name, dependency.Version)
 
 		slog.Debug("Storing chart " + archivedChart)
 		sourcePath := filepath.Join(dir, archivedChart)
