@@ -108,7 +108,8 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 	for _, dependency := range dependencies {
 		sourcePath := resolveArchiveName(dir, dependency.Name, dependency.Version)
 		if sourcePath == "" {
-			return fmt.Errorf("failed to find chart archive for %s-%s in %s: %w", dependency.Name, dependency.Version, dir, ErrChartArchiveNotFound)
+			return fmt.Errorf("failed to find chart archive for %s-%s in %s: %w",
+				dependency.Name, dependency.Version, dir, ErrChartArchiveNotFound)
 		}
 
 		cachedChart := GetConventionalArchiveName(dependency.Name, dependency.Version)

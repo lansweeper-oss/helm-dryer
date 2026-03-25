@@ -205,7 +205,8 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 
 		fullPath := resolveArchiveName(dir, dependency.Metadata.Name, dependency.Metadata.Version)
 		if fullPath == "" {
-			return nil, fmt.Errorf("failed to find dependency chart archive for %s-%s in %s: %w", dependency.Metadata.Name, dependency.Metadata.Version, dir, ErrChartArchiveNotFound)
+			return nil, fmt.Errorf("failed to find dependency chart archive for %s-%s in %s: %w",
+				dependency.Metadata.Name, dependency.Metadata.Version, dir, ErrChartArchiveNotFound)
 		}
 
 		file, err := os.Open(filepath.Clean(fullPath))
