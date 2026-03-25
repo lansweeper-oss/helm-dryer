@@ -201,9 +201,14 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 	vals := map[string]any{}
 
 	for _, dependency := range h.Chart.Dependencies() {
-		slog.Debug("Reading values for dependency", "name", dependency.Metadata.Name)
-		archive := fmt.Sprintf("%s-%s.tgz", dependency.Metadata.Name, dependency.Metadata.Version)
-		fullPath := filepath.Join(dir, archive)
+		name := dependency.Metadata.Name
+		version := dependency.Metadata.Version
+		slog.Debug("Reading values for dependency", "name", name)
+
+		fullPath := resolveArchive(dir, name, version)
+		if fullPath == "" {
+			return nil, fmt.Errorf("failed to find archive for dependency %s-%s in %s", name, version, dir)
+		}
 
 		file, err := os.Open(filepath.Clean(fullPath))
 		if err != nil {
@@ -222,8 +227,8 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 		}
 
 		if depValues := depChart.Values; len(depValues) > 0 {
-			if _, exists := vals[dependency.Metadata.Name]; !exists {
-				vals[dependency.Metadata.Name] = depValues
+			if _, exists := vals[name]; !exists {
+				vals[name] = depValues
 			}
 		}
 	}
