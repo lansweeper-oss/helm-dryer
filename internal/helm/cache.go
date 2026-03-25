@@ -159,7 +159,7 @@ func (h *Client) lookForArchive(name string, version string) bool {
 	default:
 		err = utils.CopyFile(cachedDependency, dependencyArchive)
 		if err != nil {
-						slog.Warn("failed to copy chart from cache", "archive", archive, "dir", dir, "err", err)
+			slog.Warn("failed to copy chart from cache", "archive", archive, "dir", dir, "err", err)
 
 			return false
 		}
