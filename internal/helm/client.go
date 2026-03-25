@@ -202,9 +202,10 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 
 	for _, dependency := range h.Chart.Dependencies() {
 		slog.Debug("Reading values for dependency", "name", dependency.Metadata.Name)
+
 		fullPath := resolveArchiveName(dir, dependency.Metadata.Name, dependency.Metadata.Version)
 		if fullPath == "" {
-			return nil, fmt.Errorf("failed to find dependency chart archive for %s-%s in %s", dependency.Metadata.Name, dependency.Metadata.Version, dir)
+			return nil, fmt.Errorf("failed to find dependency chart archive for %s-%s in %s: %w", dependency.Metadata.Name, dependency.Metadata.Version, dir, ErrChartArchiveNotFound)
 		}
 
 		file, err := os.Open(filepath.Clean(fullPath))

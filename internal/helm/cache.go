@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"helm.sh/helm/v3/pkg/chart"
 )
+
+var ErrChartArchiveNotFound = errors.New("chart archive not found")
 
 const (
 	Cache = "HELM_CACHE_HOME"
@@ -105,7 +108,7 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 	for _, dependency := range dependencies {
 		sourcePath := resolveArchiveName(dir, dependency.Name, dependency.Version)
 		if sourcePath == "" {
-			return fmt.Errorf("failed to find chart archive for %s-%s in %s", dependency.Name, dependency.Version, dir)
+			return fmt.Errorf("failed to find chart archive for %s-%s in %s: %w", dependency.Name, dependency.Version, dir, ErrChartArchiveNotFound)
 		}
 
 		cachedChart := GetConventionalArchiveName(dependency.Name, dependency.Version)
@@ -159,6 +162,7 @@ func (h *Client) lookForArchive(name string, version string) bool {
 	default:
 		// Copy from cache to charts/ using the conventional name
 		target := filepath.Join(dir, conventionalArchive)
+
 		err = utils.CopyFile(cachedDependency, target)
 		if err != nil {
 			slog.Warn("failed to copy chart from cache", "archive", conventionalArchive, "dir", dir, "err", err)
