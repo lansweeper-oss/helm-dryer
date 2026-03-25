@@ -131,10 +131,9 @@ func (h *Client) lookForArchive(name string, version string) bool {
 
 	dir := filepath.Join(h.Path, ChartsFolder)
 	chartsCacheDir := getChartsCacheDir()
-	dependencyArchiveName := resolveArchiveName(dir, name, version)
-	dependencyArchive := filepath.Join(dir, dependencyArchiveName)
-	// we always cache with a conventional name, even if the original archive had a different name:
-	cachedDependency := filepath.Join(chartsCacheDir, GetConventionalArchiveName(name, version))
+	conventionalArchive := GetConventionalArchiveName(name, version)
+	dependencyArchive := resolveArchiveName(dir, name, version)
+	cachedDependency := filepath.Join(chartsCacheDir, conventionalArchive)
 
 	dependencyStatInfo, err := os.Stat(dependencyArchive)
 
@@ -149,7 +148,7 @@ func (h *Client) lookForArchive(name string, version string) bool {
 	case err != nil:
 		return false
 	case cachedStatInfo.ModTime().Before(h.TTL):
-		slog.Debug("Chart " + cachedDependency + " found in cache, but TTL is expired")
+		slog.Debug("Chart " + conventionalArchive + " found in cache, but TTL is expired")
 
 		err = os.Remove(cachedDependency)
 		if err != nil {
@@ -158,15 +157,16 @@ func (h *Client) lookForArchive(name string, version string) bool {
 
 		return false
 	default:
-		// cache it (with a conventional name)
-		err = utils.CopyFile(dependencyArchive, cachedDependency)
+		// Copy from cache to charts/ using the conventional name
+		target := filepath.Join(dir, conventionalArchive)
+		err = utils.CopyFile(cachedDependency, target)
 		if err != nil {
-			slog.Warn("failed to copy chart from cache", "archive", dependencyArchiveName, "dir", dir, "err", err)
+			slog.Warn("failed to copy chart from cache", "archive", conventionalArchive, "dir", dir, "err", err)
 
 			return false
 		}
 
-		slog.Debug("Chart " + dependencyArchiveName + " copied from cache")
+		slog.Debug("Chart " + conventionalArchive + " copied from cache")
 	}
 
 	return true
