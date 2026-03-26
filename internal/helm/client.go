@@ -174,11 +174,17 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 			return nil, fmt.Errorf("failed to reload chart after dependency update: %w", err)
 		}
 
-		// Use the parent Chart.yaml dependency versions for caching, because
-		// StandardizeArchivePath renamed archives to <name>-<dep.Version>.tgz.
-		// The sub-chart's internal metadata version may differ (e.g. "v1.18.2"
-		// vs "1.18.2") and would not match the standardized filename.
-		err = h.CacheDependencies(h.Chart.Metadata.Dependencies)
+		// Build cache deps from loaded sub-charts to get resolved versions (e.g. "0.0.9"
+		// instead of the constraint "~0.0.9" that was in Chart.Metadata.Dependencies).
+		cacheDeps := make([]*chart.Dependency, 0, len(h.Chart.Dependencies()))
+		for _, c := range h.Chart.Dependencies() {
+			cacheDeps = append(cacheDeps, &chart.Dependency{
+				Name:    c.Metadata.Name,
+				Version: c.Metadata.Version,
+			})
+		}
+
+		err = h.CacheDependencies(cacheDeps)
 		if err != nil {
 			return nil, fmt.Errorf("could not store chart dependencies: %w", err)
 		}
