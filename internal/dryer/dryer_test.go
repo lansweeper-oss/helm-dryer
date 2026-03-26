@@ -131,6 +131,7 @@ func TestTemplateValues(t *testing.T) {
 		err := utils.CopyFile(
 			filepath.Join(test.Settings.Path, file),
 			filepath.Join(tempDir, file),
+			tempDir,
 		)
 		require.NoError(t, err, "Error copying file to temp directory")
 	}
@@ -171,6 +172,7 @@ func TestTemplateWithCustomDelims(t *testing.T) {
 		err := utils.CopyFile(
 			filepath.Join(test.Settings.Path, file),
 			filepath.Join(tempDir, file),
+			tempDir,
 		)
 		require.NoError(t, err, "Error copying file to temp directory")
 	}

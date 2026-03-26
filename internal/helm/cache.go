@@ -76,7 +76,7 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 		sourcePath := filepath.Join(dir, archivedChart)
 		cachePath := filepath.Join(cacheDir, archivedChart)
 
-		err := utils.CopyFile(sourcePath, cachePath)
+		err := utils.CopyFile(sourcePath, cachePath, cacheDir)
 		if err != nil {
 			return fmt.Errorf("failed to copy chart %s to cache directory: %w", archivedChart, err)
 		}
@@ -121,7 +121,7 @@ func (h *Client) lookForArchive(name string, version string) bool {
 
 		return false
 	default:
-		err = utils.CopyFile(cachedDependency, dependencyArchive)
+		err = utils.CopyFile(cachedDependency, dependencyArchive, dir)
 		if err != nil {
 			slog.Warn("failed to copy chart from cache", "archive", archive, "dir", dir, "err", err)
 

@@ -62,17 +62,38 @@ func toYAML(val any) (string, error) {
 	return strings.TrimSuffix(string(data), "\n"), nil
 }
 
+// ErrPathTraversal is returned when a destination path escapes the expected base directory.
+var ErrPathTraversal = errors.New("path traversal detected")
+
 // CopyFile copies a file from the source path to the destination path.
-func CopyFile(src, dst string) error {
+// baseDir is used to validate that the destination does not escape the expected directory.
+func CopyFile(src, dst, baseDir string) error {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
+
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve base directory %s: %w", baseDir, err)
+	}
+
+	absDst, err := filepath.Abs(dst)
+	if err != nil {
+		return fmt.Errorf("failed to resolve destination path %s: %w", dst, err)
+	}
+
+	relPath, err := filepath.Rel(absBase, absDst)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return fmt.Errorf("%w: destination %s is outside base directory %s", ErrPathTraversal, dst, baseDir)
+	}
+
+	safeDst := filepath.Join(absBase, relPath)
 
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", src, err)
 	}
 
-	err = os.WriteFile(dst, data, ReadWrite) //nolint:gosec // dst is cleaned above; callers provide controlled paths
+	err = os.WriteFile(safeDst, data, ReadWrite) //nolint:gosec // path validated against baseDir above
 	if err != nil {
 		return fmt.Errorf("failed to write destination file %s: %w", dst, err)
 	}
