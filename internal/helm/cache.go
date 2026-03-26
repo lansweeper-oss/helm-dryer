@@ -109,6 +109,7 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 		archivedChart := resolveArchiveName(dir, dependency.Name, dependency.Version)
 		if archivedChart == "" {
 			archivedChart = GetConventionalArchiveName(dependency.Name, dependency.Version)
+
 			return fmt.Errorf("failed to copy chart %s to cache directory: %w", archivedChart, ErrChartArchiveNotFound)
 		}
 
