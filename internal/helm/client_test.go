@@ -664,6 +664,183 @@ dependencies:
 	assert.True(t, os.IsNotExist(err), "expired cached archive should have been deleted")
 }
 
+// TestStaleDependenciesFindsLocalArchiveWithSuffix verifies that StaleDependencies
+// recognises an archive whose filename has an extra suffix after the version
+// (e.g. "flink-kubernetes-operator-1.14.0-helm.tgz" instead of the conventional
+// "flink-kubernetes-operator-1.14.0.tgz"). The dependency should NOT be reported
+// as stale when such an archive is present in the local charts/ directory.
+func TestStaleDependenciesFindsLocalArchiveWithSuffix(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
+apiVersion: v2
+name: test-chart
+version: 0.1.0
+dependencies:
+  - name: flink-kubernetes-operator
+    version: 1.14.0
+`), utils.ReadWrite)
+	require.NoError(t, err)
+
+	// Load chart before creating charts/ so loader.LoadDir doesn't try to unpack the dummy archive
+	helmClient := client.Client{
+		Path:  tempDir,
+		Debug: true,
+		TTL:   time.Now().Add(-10 * time.Minute),
+	}
+	err = helmClient.LoadChart()
+	require.NoError(t, err)
+
+	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
+	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	// Place a non-conventional archive (note the "-helm" suffix before .tgz)
+	nonConventional := filepath.Join(chartsDir, "flink-kubernetes-operator-1.14.0-helm.tgz")
+	err = os.WriteFile(nonConventional, []byte("dummy"), utils.ReadWrite)
+	require.NoError(t, err)
+
+	staleDeps := helmClient.StaleDependencies()
+	assert.Empty(t, staleDeps, "should find the non-conventional archive and not report it as stale")
+}
+
+// TestStaleDependenciesFindsLocalArchiveWithVersionPrefix verifies that StaleDependencies
+// recognises an archive where the version is prefixed with "v" and has an extra suffix
+// (e.g. "flink-kubernetes-operator-v1.14.0-helm.tgz" when the declared version is "1.14.0").
+func TestStaleDependenciesFindsLocalArchiveWithVersionPrefix(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
+apiVersion: v2
+name: test-chart
+version: 0.1.0
+dependencies:
+  - name: flink-kubernetes-operator
+    version: 1.14.0
+`), utils.ReadWrite)
+	require.NoError(t, err)
+
+	// Load chart before creating charts/ so loader.LoadDir doesn't try to unpack the dummy archive
+	helmClient := client.Client{
+		Path:  tempDir,
+		Debug: true,
+		TTL:   time.Now().Add(-10 * time.Minute),
+	}
+	err = helmClient.LoadChart()
+	require.NoError(t, err)
+
+	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
+	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	// Place an archive with a "v" prefix on the version AND a suffix
+	nonConventional := filepath.Join(chartsDir, "flink-kubernetes-operator-v1.14.0-helm.tgz")
+	err = os.WriteFile(nonConventional, []byte("dummy"), utils.ReadWrite)
+	require.NoError(t, err)
+
+	staleDeps := helmClient.StaleDependencies()
+	assert.Empty(t, staleDeps, "should find the archive with v-prefixed version and not report it as stale")
+}
+
+// TestStaleDependenciesFindsCachedArchiveWithNonConventionalName verifies that when a
+// non-conventional archive (e.g. "mylib-2.0.0-helm.tgz") exists in the cache directory,
+// StaleDependencies finds it, copies it to the local charts/ folder, and does NOT
+// report the dependency as stale.
+func TestStaleDependenciesFindsCachedArchiveWithNonConventionalName(t *testing.T) {
+	tempDir := t.TempDir()
+	cacheDir := t.TempDir()
+	t.Setenv("HELM_CACHE_HOME", cacheDir)
+
+	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
+apiVersion: v2
+name: test-chart
+version: 0.1.0
+dependencies:
+  - name: mylib
+    version: 2.0.0
+`), utils.ReadWrite)
+	require.NoError(t, err)
+
+	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
+	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	chartsCacheDir := filepath.Join(cacheDir, client.ChartsFolder)
+	err = os.MkdirAll(chartsCacheDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	// Place a non-conventional archive in the cache only (not in charts/)
+	cachedArchive := filepath.Join(chartsCacheDir, "mylib-2.0.0-helm.tgz")
+	err = os.WriteFile(cachedArchive, []byte("cached-non-conventional"), utils.ReadWrite)
+	require.NoError(t, err)
+
+	helmClient := client.Client{
+		Path:  tempDir,
+		Debug: true,
+		TTL:   time.Now().Add(-10 * time.Minute),
+	}
+	err = helmClient.LoadChart()
+	require.NoError(t, err)
+
+	staleDeps := helmClient.StaleDependencies()
+	assert.Empty(t, staleDeps, "should find non-conventional archive in cache and not report stale")
+
+	// Verify the archive was copied from cache to charts/ with its original name
+	copiedArchive := filepath.Join(chartsDir, "mylib-2.0.0-helm.tgz")
+	data, err := os.ReadFile(copiedArchive)
+	require.NoError(t, err, "non-conventional archive should have been copied from cache to charts/")
+	assert.Equal(t, "cached-non-conventional", string(data))
+}
+
+// TestCacheDependenciesCopiesNonConventionalArchive verifies that CacheDependencies
+// correctly finds a non-conventional archive in the local charts/ directory and copies
+// it to the cache with its actual filename (not the conventional name).
+func TestCacheDependenciesCopiesNonConventionalArchive(t *testing.T) {
+	tempDir := t.TempDir()
+	cacheDir := t.TempDir()
+	t.Setenv("HELM_CACHE_HOME", cacheDir)
+
+	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
+apiVersion: v2
+name: test-chart
+version: 0.1.0
+`), utils.ReadWrite)
+	require.NoError(t, err)
+
+	// Load chart before creating charts/ so loader.LoadDir doesn't try to unpack the dummy archive
+	helmClient := client.Client{Path: tempDir, Debug: true}
+	err = helmClient.LoadChart()
+	require.NoError(t, err)
+
+	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
+	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	chartsCacheDir := filepath.Join(cacheDir, client.ChartsFolder)
+	err = os.MkdirAll(chartsCacheDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	// Place a non-conventional archive in charts/
+	nonConventional := "flink-kubernetes-operator-1.14.0-helm.tgz"
+	err = os.WriteFile(filepath.Join(chartsDir, nonConventional), []byte("archive-content"), utils.ReadWrite)
+	require.NoError(t, err)
+
+	err = helmClient.CacheDependencies([]*chart.Dependency{
+		{Name: "flink-kubernetes-operator", Version: "1.14.0"},
+	})
+	require.NoError(t, err)
+
+	// Verify the file was copied to cache with the actual (non-conventional) name
+	cachedFile := filepath.Join(chartsCacheDir, nonConventional)
+	data, err := os.ReadFile(cachedFile)
+	require.NoError(t, err, "non-conventional archive should exist in cache")
+	assert.Equal(t, "archive-content", string(data))
+}
+
 func TestPackageLocalDependencyAbsolutePath(t *testing.T) {
 	tempDir := t.TempDir()
 	cacheDir := t.TempDir()

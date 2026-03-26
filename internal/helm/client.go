@@ -202,7 +202,6 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 
 	for _, dependency := range h.Chart.Dependencies() {
 		slog.Debug("Reading values for dependency", "name", dependency.Metadata.Name)
-
 		archive := resolveArchiveName(dir, dependency.Metadata.Name, dependency.Metadata.Version)
 		fullPath := filepath.Join(dir, archive)
 

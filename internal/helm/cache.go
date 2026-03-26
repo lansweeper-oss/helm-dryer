@@ -135,16 +135,26 @@ func (h *Client) lookForArchive(name string, version string) bool {
 
 	dir := filepath.Join(h.Path, ChartsFolder)
 	chartsCacheDir := getChartsCacheDir()
-	archive := GetConventionalArchiveName(name, version)
-	dependencyArchive := filepath.Join(dir, archive)
-	cachedDependency := filepath.Join(chartsCacheDir, archive)
 
-	dependencyStatInfo, err := os.Stat(dependencyArchive)
+	// Check the local charts/ directory first, falling back to a fuzzy name scan
+	// so we also find archives like name-version-helm.tgz or name-vVersion.tgz.
+	archive := resolveArchiveName(dir, name, version)
+	if archive != "" {
+		dependencyArchive := filepath.Join(dir, archive)
 
-	// If the archive exists and is newer than the TTL, we can use it directly
-	if err == nil && dependencyStatInfo.ModTime().After(h.TTL) {
-		return true
+		dependencyStatInfo, err := os.Stat(dependencyArchive)
+		if err == nil && dependencyStatInfo.ModTime().After(h.TTL) {
+			return true
+		}
 	}
+
+	// Check the cache directory with the same fuzzy name resolution.
+	cachedArchive := resolveArchiveName(chartsCacheDir, name, version)
+	if cachedArchive == "" {
+		return false
+	}
+
+	cachedDependency := filepath.Join(chartsCacheDir, cachedArchive)
 
 	cachedStatInfo, err := os.Stat(cachedDependency)
 
@@ -152,7 +162,7 @@ func (h *Client) lookForArchive(name string, version string) bool {
 	case err != nil:
 		return false
 	case cachedStatInfo.ModTime().Before(h.TTL):
-		slog.Debug("Chart " + archive + " found in cache, but TTL is expired")
+		slog.Debug("Chart " + cachedArchive + " found in cache, but TTL is expired")
 
 		err = os.Remove(cachedDependency)
 		if err != nil {
@@ -161,14 +171,17 @@ func (h *Client) lookForArchive(name string, version string) bool {
 
 		return false
 	default:
+		// Copy from cache to local charts/ dir, preserving the original archive name.
+		dependencyArchive := filepath.Join(dir, cachedArchive)
+
 		err = utils.CopyFile(cachedDependency, dependencyArchive)
 		if err != nil {
-			slog.Warn("failed to copy chart from cache", "archive", archive, "dir", dir, "err", err)
+			slog.Warn("failed to copy chart from cache", "archive", cachedArchive, "dir", dir, "err", err)
 
 			return false
 		}
 
-		slog.Debug("Chart " + archive + " copied from cache")
+		slog.Debug("Chart " + cachedArchive + " copied from cache")
 	}
 
 	return true
