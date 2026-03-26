@@ -73,7 +73,7 @@ func resolveArchiveName(dir, name, version string) string {
 	return findArchiveByName(dir, name, version)
 }
 
-// findArchiveByName scans dir for .tgz files and returns the full path of the first one
+// findArchiveByName scans dir for .tgz files and returns the base filename of the first one
 // whose filename contains both the exact name and version.
 func findArchiveByName(dir, name, version string) string {
 	matches, err := filepath.Glob(filepath.Join(dir, "*.tgz"))

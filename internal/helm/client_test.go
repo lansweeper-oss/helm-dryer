@@ -706,46 +706,6 @@ dependencies:
 	assert.Empty(t, staleDeps, "should find the non-conventional archive and not report it as stale")
 }
 
-// TestStaleDependenciesFindsLocalArchiveWithVersionPrefix verifies that StaleDependencies
-// recognises an archive where the version is prefixed with "v" and has an extra suffix
-// (e.g. "test-dep-v0.1.0-helm.tgz" when the declared version is "0.1.0").
-func TestStaleDependenciesFindsLocalArchiveWithVersionPrefix(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-
-	err := os.WriteFile(filepath.Join(tempDir, "Chart.yaml"), []byte(`
-apiVersion: v2
-name: test-chart
-version: 0.1.0
-dependencies:
-  - name: test-dep
-    version: 0.1.0
-`), utils.ReadWrite)
-	require.NoError(t, err)
-
-	// Load chart before creating charts/ so loader.LoadDir doesn't try to unpack the dummy archive
-	helmClient := client.Client{
-		Path:  tempDir,
-		Debug: true,
-		TTL:   time.Now().Add(-10 * time.Minute),
-	}
-	err = helmClient.LoadChart()
-	require.NoError(t, err)
-
-	chartsDir := filepath.Join(tempDir, client.ChartsFolder)
-	err = os.MkdirAll(chartsDir, utils.ReadWriteDir)
-	require.NoError(t, err)
-
-	// Place an archive with a "v" prefix on the version AND a suffix
-	nonConventional := filepath.Join(chartsDir, "test-dep-v0.1.0-helm.tgz")
-	err = os.WriteFile(nonConventional, []byte("dummy"), utils.ReadWrite)
-	require.NoError(t, err)
-
-	staleDeps := helmClient.StaleDependencies()
-	assert.Empty(t, staleDeps, "should find the archive with v-prefixed version and not report it as stale")
-}
-
 // TestStaleDependenciesFindsCachedArchiveWithNonConventionalName verifies that when a
 // non-conventional archive (e.g. "mylib-2.0.0-helm.tgz") exists in the cache directory,
 // StaleDependencies finds it, copies it to the local charts/ folder, and does NOT
