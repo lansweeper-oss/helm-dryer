@@ -174,17 +174,11 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 			return nil, fmt.Errorf("failed to reload chart after dependency update: %w", err)
 		}
 
-		// Build cache deps from loaded sub-charts to get resolved versions (e.g. "0.0.9"
-		// instead of the constraint "~0.0.9" that was in Chart.Metadata.Dependencies).
-		cacheDeps := make([]*chart.Dependency, 0, len(h.Chart.Dependencies()))
-		for _, c := range h.Chart.Dependencies() {
-			cacheDeps = append(cacheDeps, &chart.Dependency{
-				Name:    c.Metadata.Name,
-				Version: c.Metadata.Version,
-			})
-		}
-
-		err = h.CacheDependencies(cacheDeps)
+		// Use the parent Chart.yaml dependency versions for caching, because
+		// StandardizeArchivePath renamed archives to <name>-<dep.Version>.tgz.
+		// The sub-chart's internal metadata version may differ (e.g. "v1.18.2"
+		// vs "1.18.2") and would not match the standardized filename.
+		err = h.CacheDependencies(h.Chart.Metadata.Dependencies)
 		if err != nil {
 			return nil, fmt.Errorf("could not store chart dependencies: %w", err)
 		}
@@ -250,7 +244,8 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 			ref := strings.TrimRight(dep.Repository, "/") + "/" + dep.Name
 			slog.Debug("Downloading OCI dependency", "ref", ref, "version", dep.Version)
 
-			_, _, err = downloader.DownloadTo(ref, dep.Version, chartsDir)
+			err = downloadAndStandardize(downloader, ref, dep, chartsDir)
+
 		default:
 			var chartURL string
 
@@ -267,7 +262,7 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 
 			slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
 
-			_, _, err = downloader.DownloadTo(chartURL, dep.Version, chartsDir)
+			err = downloadAndStandardize(downloader, chartURL, dep, chartsDir)
 		}
 
 		if err != nil {
@@ -275,6 +270,39 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 		}
 
 		slog.Debug("Dependency downloaded", "name", dep.Name, "version", dep.Version)
+	}
+
+	return nil
+}
+
+// downloadAndStandardize downloads a chart and renames the resulting archive to
+// the canonical format: <name>-<version>.tgz. This handles OCI registries and
+// HTTP repos that may produce non-standard filenames (e.g. suffixes like "-helm"
+// or version prefixes like "v").
+func downloadAndStandardize(dl *downloader.ChartDownloader, ref string, dep *chart.Dependency, destDir string) error {
+	downloadedPath, _, err := dl.DownloadTo(ref, dep.Version, destDir)
+	if err != nil {
+		return fmt.Errorf("failed to download %s: %w", ref, err)
+	}
+
+	return StandardizeArchivePath(downloadedPath, dep.Name, dep.Version)
+}
+
+// StandardizeArchivePath renames a downloaded chart archive to the canonical
+// <name>-<version>.tgz format if the filename doesn't already match.
+func StandardizeArchivePath(downloadedPath, name, version string) error {
+	expectedPath := filepath.Join(filepath.Dir(downloadedPath), GetArchiveName(name, version))
+	if downloadedPath == expectedPath {
+		return nil
+	}
+
+	slog.Debug("Standardizing chart archive name",
+		"from", filepath.Base(downloadedPath),
+		"to", filepath.Base(expectedPath))
+
+	err := os.Rename(downloadedPath, expectedPath)
+	if err != nil {
+		return fmt.Errorf("failed to rename %s to %s: %w", downloadedPath, expectedPath, err)
 	}
 
 	return nil
