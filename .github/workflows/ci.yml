@@ -5,7 +5,7 @@ defaults:
     shell: bash
 env:
   go_version: '1.26.0'
-  golangci_version: 'v2.11.4'
+  golangci_version: 'v2.10.1'
 on:
   pull_request: {}
 concurrency:

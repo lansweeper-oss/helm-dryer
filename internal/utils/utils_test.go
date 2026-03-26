@@ -474,7 +474,7 @@ func TestCopyFile(t *testing.T) {
 		err := os.WriteFile(srcFile, content, utils.ReadWrite)
 		require.NoError(t, err)
 
-		err = utils.CopyFile(srcFile, dstFile, dstDir)
+		err = utils.CopyFile(srcFile, dstFile)
 		require.NoError(t, err)
 
 		result, err := os.ReadFile(dstFile)
@@ -485,10 +485,9 @@ func TestCopyFile(t *testing.T) {
 	t.Run("source file does not exist", func(t *testing.T) {
 		t.Parallel()
 
-		dstDir := t.TempDir()
-		dstFile := filepath.Join(dstDir, "dest.txt")
+		dstFile := filepath.Join(t.TempDir(), "dest.txt")
 
-		err := utils.CopyFile("/nonexistent/file.txt", dstFile, dstDir)
+		err := utils.CopyFile("/nonexistent/file.txt", dstFile)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read file")
 	})
@@ -500,7 +499,7 @@ func TestCopyFile(t *testing.T) {
 		err := os.WriteFile(srcFile, []byte("data"), utils.ReadWrite)
 		require.NoError(t, err)
 
-		err = utils.CopyFile(srcFile, "/nonexistent/dir/dest.txt", "/nonexistent/dir")
+		err = utils.CopyFile(srcFile, "/nonexistent/dir/dest.txt")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write destination file")
 	})
