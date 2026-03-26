@@ -666,8 +666,8 @@ dependencies:
 
 // TestStaleDependenciesFindsLocalArchiveWithSuffix verifies that StaleDependencies
 // recognises an archive whose filename has an extra suffix after the version
-// (e.g. "flink-kubernetes-operator-1.14.0-helm.tgz" instead of the conventional
-// "flink-kubernetes-operator-1.14.0.tgz"). The dependency should NOT be reported
+// (e.g. "test-dep-0.1.0-helm.tgz" instead of the conventional
+// "test-dep-0.1.0.tgz"). The dependency should NOT be reported
 // as stale when such an archive is present in the local charts/ directory.
 func TestStaleDependenciesFindsLocalArchiveWithSuffix(t *testing.T) {
 	t.Parallel()
@@ -679,8 +679,8 @@ apiVersion: v2
 name: test-chart
 version: 0.1.0
 dependencies:
-  - name: flink-kubernetes-operator
-    version: 1.14.0
+  - name: test-dep
+    version: 0.1.0
 `), utils.ReadWrite)
 	require.NoError(t, err)
 
@@ -698,7 +698,7 @@ dependencies:
 	require.NoError(t, err)
 
 	// Place a non-conventional archive (note the "-helm" suffix before .tgz)
-	nonConventional := filepath.Join(chartsDir, "flink-kubernetes-operator-1.14.0-helm.tgz")
+	nonConventional := filepath.Join(chartsDir, "test-dep-0.1.0-helm.tgz")
 	err = os.WriteFile(nonConventional, []byte("dummy"), utils.ReadWrite)
 	require.NoError(t, err)
 
@@ -708,7 +708,7 @@ dependencies:
 
 // TestStaleDependenciesFindsLocalArchiveWithVersionPrefix verifies that StaleDependencies
 // recognises an archive where the version is prefixed with "v" and has an extra suffix
-// (e.g. "flink-kubernetes-operator-v1.14.0-helm.tgz" when the declared version is "1.14.0").
+// (e.g. "test-dep-v0.1.0-helm.tgz" when the declared version is "0.1.0").
 func TestStaleDependenciesFindsLocalArchiveWithVersionPrefix(t *testing.T) {
 	t.Parallel()
 
@@ -719,8 +719,8 @@ apiVersion: v2
 name: test-chart
 version: 0.1.0
 dependencies:
-  - name: flink-kubernetes-operator
-    version: 1.14.0
+  - name: test-dep
+    version: 0.1.0
 `), utils.ReadWrite)
 	require.NoError(t, err)
 
@@ -738,7 +738,7 @@ dependencies:
 	require.NoError(t, err)
 
 	// Place an archive with a "v" prefix on the version AND a suffix
-	nonConventional := filepath.Join(chartsDir, "flink-kubernetes-operator-v1.14.0-helm.tgz")
+	nonConventional := filepath.Join(chartsDir, "test-dep-v0.1.0-helm.tgz")
 	err = os.WriteFile(nonConventional, []byte("dummy"), utils.ReadWrite)
 	require.NoError(t, err)
 
@@ -825,12 +825,12 @@ version: 0.1.0
 	require.NoError(t, err)
 
 	// Place a non-conventional archive in charts/
-	nonConventional := "flink-kubernetes-operator-1.14.0-helm.tgz"
+	nonConventional := "test-dep-0.1.0-helm.tgz"
 	err = os.WriteFile(filepath.Join(chartsDir, nonConventional), []byte("archive-content"), utils.ReadWrite)
 	require.NoError(t, err)
 
 	err = helmClient.CacheDependencies([]*chart.Dependency{
-		{Name: "flink-kubernetes-operator", Version: "1.14.0"},
+		{Name: "test-dep", Version: "0.1.0"},
 	})
 	require.NoError(t, err)
 
