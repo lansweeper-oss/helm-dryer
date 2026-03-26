@@ -337,8 +337,8 @@ dependencies:
 	require.NoError(t, err, "Failed to create charts directory")
 
 	helmClient := client.Client{Path: tempDir, Debug: true}
-	// Downloaded file contains v in the version for this chart :(
-	archiveFile := fmt.Sprintf("%s-v%s.tgz", chartName, chartVersion)
+	// Downloaded file used to contain v in the version, but downloadAndStandardize now renames it.
+	archiveFile := client.GetArchiveName(chartName, chartVersion)
 
 	err = helmClient.LoadChart()
 	require.NoError(t, err, "Failed to load chart")
@@ -358,19 +358,11 @@ dependencies:
 	err = client.EnsureCacheDirs(tempDir)
 	require.NoError(t, err, "Failed to ensure cache directories")
 
-	// Build deps from loaded chart to get actual versions (e.g. v1.18.2 not 1.18.2).
-	dependencies := helmClient.Chart.Dependencies()
-
-	loadedDeps := make([]*chart.Dependency, 0, len(dependencies))
-	for _, c := range dependencies {
-		loadedDeps = append(loadedDeps, &chart.Dependency{
-			Name:    c.Metadata.Name,
-			Version: c.Metadata.Version,
-		})
-	}
+	// Use Chart.yaml dependency versions for caching (matches standardized filenames).
+	cacheDeps := helmClient.Chart.Metadata.Dependencies
 
 	// Verify that dependency files were copied to cache
-	err = helmClient.CacheDependencies(loadedDeps)
+	err = helmClient.CacheDependencies(cacheDeps)
 	require.NoError(t, err, "CacheDependencies should not return an error")
 
 	cachedChart := filepath.Join(cacheDir, client.ChartsFolder, archiveFile)
@@ -383,7 +375,7 @@ dependencies:
 	err = os.Remove(archivedChart)
 	require.NoError(t, err, "Failed to remove test dependency file")
 
-	err = helmClient.CacheDependencies(loadedDeps)
+	err = helmClient.CacheDependencies(cacheDeps)
 	assert.Contains(t, err.Error(), fmt.Sprintf("failed to copy chart %s to cache directory", archiveFile))
 
 	// Test case: StoreDeps with no dependencies is a no-op
@@ -712,4 +704,69 @@ dependencies:
 	archive := filepath.Join(chartsDir, "absolute-sub-0.3.0.tgz")
 	_, err = os.Stat(archive)
 	require.NoError(t, err, "archive should exist after packaging with absolute path")
+}
+
+func TestStandardizeArchivePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		fileName     string
+		depName      string
+		depVersion   string
+		expectedFile string
+	}{
+		{
+			name:         "helm suffix is removed",
+			fileName:     "flink-kubernetes-operator-1.14.0-helm.tgz",
+			depName:      "flink-kubernetes-operator",
+			depVersion:   "1.14.0",
+			expectedFile: "flink-kubernetes-operator-1.14.0.tgz",
+		},
+		{
+			name:         "v prefix in version is removed",
+			fileName:     "cert-manager-v1.18.2.tgz",
+			depName:      "cert-manager",
+			depVersion:   "1.18.2",
+			expectedFile: "cert-manager-1.18.2.tgz",
+		},
+		{
+			name:         "v prefix and helm suffix combined",
+			fileName:     "flink-kubernetes-operator-v1.14.0-helm.tgz",
+			depName:      "flink-kubernetes-operator",
+			depVersion:   "1.14.0",
+			expectedFile: "flink-kubernetes-operator-1.14.0.tgz",
+		},
+		{
+			name:         "already canonical name is not modified",
+			fileName:     "redis-6.0.0.tgz",
+			depName:      "redis",
+			depVersion:   "6.0.0",
+			expectedFile: "redis-6.0.0.tgz",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			srcPath := filepath.Join(dir, test.fileName)
+			err := os.WriteFile(srcPath, []byte("archive-content"), utils.ReadWrite)
+			require.NoError(t, err)
+
+			err = client.StandardizeArchivePath(srcPath, test.depName, test.depVersion)
+			require.NoError(t, err)
+
+			expectedPath := filepath.Join(dir, test.expectedFile)
+			data, err := os.ReadFile(expectedPath)
+			require.NoError(t, err, "expected file %s to exist", test.expectedFile)
+			assert.Equal(t, "archive-content", string(data))
+
+			if test.fileName != test.expectedFile {
+				_, err = os.Stat(srcPath)
+				assert.True(t, os.IsNotExist(err), "original file %s should have been renamed", test.fileName)
+			}
+		})
+	}
 }

@@ -65,13 +65,14 @@ func toYAML(val any) (string, error) {
 // CopyFile copies a file from the source path to the destination path.
 func CopyFile(src, dst string) error {
 	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
 
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", src, err)
 	}
 
-	err = os.WriteFile(dst, data, ReadWrite)
+	err = os.WriteFile(dst, data, ReadWrite) //nolint:gosec // dst is cleaned above; callers provide controlled paths
 	if err != nil {
 		return fmt.Errorf("failed to write destination file %s: %w", dst, err)
 	}
