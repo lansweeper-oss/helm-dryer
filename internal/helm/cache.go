@@ -107,6 +107,10 @@ func (h *Client) CacheDependencies(dependencies []*chart.Dependency) error {
 
 	for _, dependency := range dependencies {
 		archivedChart := resolveArchiveName(dir, dependency.Name, dependency.Version)
+		if archivedChart == "" {
+			archivedChart = GetConventionalArchiveName(dependency.Name, dependency.Version)
+			return fmt.Errorf("failed to copy chart %s to cache directory: %w", archivedChart, ErrChartArchiveNotFound)
+		}
 
 		slog.Debug("Storing chart " + archivedChart)
 		sourcePath := filepath.Join(dir, archivedChart)
