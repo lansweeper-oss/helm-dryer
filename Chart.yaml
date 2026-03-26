@@ -1,9 +1,0 @@
-apiVersion: v2
-name: flink-operator
-version: 1.0.0
-type: application
-
-dependencies:
-- name: flink-kubernetes-operator
-  version: 1.14.0
-  repository: https://downloads.apache.org/flink/flink-kubernetes-operator-1.14.0/
