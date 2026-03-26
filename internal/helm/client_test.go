@@ -337,7 +337,6 @@ dependencies:
 	require.NoError(t, err, "Failed to create charts directory")
 
 	helmClient := client.Client{Path: tempDir, Debug: true}
-	// Downloaded file used to contain v in the version, but downloadAndStandardize now renames it.
 	archiveFile := client.GetArchiveName(chartName, chartVersion)
 
 	err = helmClient.LoadChart()
