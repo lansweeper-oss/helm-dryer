@@ -101,14 +101,30 @@ func (h *Client) StaleDependencies() []*chart.Dependency {
 		return h.Chart.Metadata.Dependencies
 	}
 
+	loadedCharts := make(map[string]*chart.Chart)
+	for _, loadedChart := range h.Chart.Dependencies() {
+		loadedCharts[loadedChart.Metadata.Name] = loadedChart
+	}
+
 	needUpdate := []*chart.Dependency{}
 
 	for _, dependency := range h.Chart.Metadata.Dependencies {
-		slog.Debug("Checking dependency: " + dependency.Name + " version: " + dependency.Version)
-
-		exists := h.lookForArchive(dependency.Name, dependency.Version)
+		depChart, exists := loadedCharts[dependency.Name]
 		if !exists {
-			slog.Debug("Dependency not found, triggering an update")
+			slog.Debug(
+				"Dependency not found in loaded chart, triggering an update",
+				"name", dependency.Name, "version", dependency.Version,
+			)
+
+			needUpdate = append(needUpdate, dependency)
+
+			continue
+		}
+		slog.Debug("Checking dependency", "name", depChart.Metadata.Name, "version", depChart.Metadata.Version)
+
+		archiveExists := h.lookForArchive(depChart.Metadata.Name, depChart.Metadata.Version)
+		if !archiveExists {
+			slog.Debug("Dependency not found, triggering an update", "name", dependency.Name)
 
 			needUpdate = append(needUpdate, dependency)
 		}
