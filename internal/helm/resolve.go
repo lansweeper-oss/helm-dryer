@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/lansweeper-oss/helm-dryer/internal/errors"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmCli "helm.sh/helm/v3/pkg/cli"
@@ -14,23 +15,12 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 )
 
-// ResolveVersion resolves the version of a chart dependency.
-func (h *Client) ResolveVersion(dependency *chart.Dependency) (string, error) {
-	if strings.HasPrefix(dependency.Repository, LocalRepoPrefix) {
-		return h.resolveLocalVersion(dependency)
-	}
-	if ociRegistry.IsOCI(dependency.Repository) {
-		return h.resolveOCIVersion(dependency)
-	}
-	return h.resolveHTTPVersion(dependency)
-}
-
-func (h *Client) findBestVersionMatch(availableVersions []string, constraint string) (string, error) {
+func (h *Client) FindBestVersionMatch(availableVersions []string, constraint string) (string, error) {
 	// Use semver package to find best match
 	// Or iterate and find the highest version that satisfies constraint
 	versionConstraint, err := semver.NewConstraint(constraint)
 	if err != nil {
-		return "", fmt.Errorf("invalid version constraint %s: %w", constraint, err)
+		return "", errors.ErrConstraintNotSatisfied
 	}
 
 	var latestVersion *semver.Version
@@ -50,11 +40,31 @@ func (h *Client) findBestVersionMatch(availableVersions []string, constraint str
 			}
 		}
 	}
+
 	if latestTag != "" {
 		return latestTag, nil
 	}
 
-	return "", fmt.Errorf("no version matching constraint %s found", constraint)
+	return "", errors.ErrConstraintNotSatisfied
+}
+
+// ResolveVersion resolves the version of a chart dependency.
+func (h *Client) ResolveVersion(dependency *chart.Dependency) (string, error) {
+	// Return the version directly if it's already a specific version (not a constraint)
+	_, err := semver.NewVersion(dependency.Version)
+	if err == nil {
+		return dependency.Version, nil
+	}
+
+	if strings.HasPrefix(dependency.Repository, LocalRepoPrefix) {
+		return h.resolveLocalVersion(dependency)
+	}
+
+	if ociRegistry.IsOCI(dependency.Repository) {
+		return h.resolveOCIVersion(dependency)
+	}
+
+	return h.resolveHTTPVersion(dependency)
 }
 
 func (h *Client) resolveHTTPVersion(dep *chart.Dependency) (string, error) {
@@ -79,14 +89,17 @@ func (h *Client) resolveHTTPVersion(dep *chart.Dependency) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to download index: %w", err)
 	}
+
 	index, err := repo.LoadIndexFile(indexFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to load index: %w", err)
 	}
+
 	version, err := index.Get(dep.Name, dep.Version)
 	if err != nil {
 		return "", fmt.Errorf("failed to find version %s for chart %s in index: %w", dep.Version, dep.Name, err)
 	}
+
 	return version.Version, nil
 }
 
@@ -97,6 +110,7 @@ func (h *Client) resolveLocalVersion(dep *chart.Dependency) (string, error) {
 	if !filepath.IsAbs(localPath) {
 		localPath = filepath.Join(h.Path, localPath)
 	}
+
 	localPath = filepath.Clean(localPath)
 
 	localChart, err := loader.LoadDir(localPath)
@@ -118,7 +132,7 @@ func (h *Client) resolveLocalVersion(dep *chart.Dependency) (string, error) {
 	}
 
 	if !versionConstraint.Check(version) {
-		return "", fmt.Errorf("local chart version %s does not satisfy constraint %s", localVersion, dep.Version)
+		return "", errors.ErrConstraintNotSatisfied
 	}
 
 	return localVersion, nil
@@ -132,7 +146,7 @@ func (h *Client) resolveOCIVersion(dep *chart.Dependency) (string, error) {
 		return "", fmt.Errorf("failed to create registry client: %w", err)
 	}
 
-	ref := strings.TrimLeft(dep.Repository, "oci://") + "/" + dep.Name
+	ref := strings.TrimPrefix(dep.Repository, "oci://") + "/" + dep.Name
 
 	tags, err := registryClient.Tags(ref)
 	if err != nil {
@@ -140,14 +154,14 @@ func (h *Client) resolveOCIVersion(dep *chart.Dependency) (string, error) {
 	}
 
 	if len(tags) == 0 {
-		return "", fmt.Errorf("no versions found for %s", ref)
+		return "", errors.ErrNotFound
 	}
 
 	// Find the best matching version using semver constraints
 	// OCI tags are typically semantic versions
-	bestMatch, err := h.findBestVersionMatch(tags, dep.Version)
+	bestMatch, err := h.FindBestVersionMatch(tags, dep.Version)
 	if err != nil {
-		return "", fmt.Errorf("no version matching %s found", dep.Version)
+		return "", errors.ErrNotFound
 	}
 
 	return bestMatch, nil

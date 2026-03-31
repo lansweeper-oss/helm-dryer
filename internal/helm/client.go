@@ -115,6 +115,7 @@ func (h *Client) StaleDependencies() []*chart.Dependency {
 			)
 
 			needUpdate = append(needUpdate, dependency)
+
 			continue
 		}
 		// Update the dependency version to the resolved one and work with that from now on.

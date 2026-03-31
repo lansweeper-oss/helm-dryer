@@ -1,4 +1,4 @@
-package client
+package client_test
 
 import (
 	"fmt"
@@ -9,12 +9,17 @@ import (
 	"strings"
 	"testing"
 
+	helmClient "github.com/lansweeper-oss/helm-dryer/internal/helm"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/chart"
 	ociRegistry "helm.sh/helm/v3/pkg/registry"
 )
 
 func TestFindBestVersionMatch(t *testing.T) {
-	client := &Client{}
+	t.Parallel()
+
+	client := &helmClient.Client{}
 
 	tests := []struct {
 		name              string
@@ -85,30 +90,31 @@ func TestFindBestVersionMatch(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			version, err := client.findBestVersionMatch(tt.availableVersions, tt.constraint)
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-			if tt.expectedError && err == nil {
-				t.Errorf("expected error, got nil")
-			}
-			if !tt.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !tt.expectedError && version != tt.expectedVersion {
-				t.Errorf("expected version %s, got %s", tt.expectedVersion, version)
+			version, err := client.FindBestVersionMatch(testCase.availableVersions, testCase.constraint)
+
+			if testCase.expectedError {
+				require.Error(t, err)
+				assert.Empty(t, version)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, testCase.expectedVersion, version)
 			}
 		})
 	}
 }
 
 func TestResolveHTTPVersion(t *testing.T) {
+	t.Parallel()
 	// Create a mock HTTP server that returns a valid Helm index
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "index.yaml") {
-			w.Header().Set("Content-Type", "application/yaml")
+			writer.Header().Set("Content-Type", "application/yaml")
 			// Valid Helm index format (YAML, no "kind" field)
-			fmt.Fprint(w, `apiVersion: v1
+			fmt.Fprint(writer, `apiVersion: v1
 entries:
   mychart:
     - name: mychart
@@ -134,12 +140,13 @@ entries:
         - https://example.com/mychart-2.0.0.tgz
 `)
 		} else {
-			w.WriteHeader(http.StatusNotFound)
+			writer.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer server.Close()
 
-	client := &Client{
+	t.Cleanup(func() { server.Close() })
+
+	client := &helmClient.Client{
 		Debug: false,
 	}
 
@@ -180,34 +187,36 @@ entries:
 			expectedError:   false,
 		},
 		{
-			name: "chart not found",
+			name: "invalid fixed version",
 			dep: &chart.Dependency{
-				Name:       "nonexistent",
-				Version:    "1.0.0",
+				Name:       "mychart",
+				Version:    "vee1",
 				Repository: server.URL,
 			},
 			expectedError: true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			version, err := client.resolveHTTPVersion(tt.dep)
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-			if tt.expectedError && err == nil {
-				t.Errorf("expected error, got nil")
-			}
-			if !tt.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !tt.expectedError && version != tt.expectedVersion {
-				t.Errorf("expected version %s, got %s", tt.expectedVersion, version)
+			version, err := client.ResolveVersion(testCase.dep)
+
+			if testCase.expectedError {
+				require.Error(t, err)
+				assert.Empty(t, version)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, testCase.expectedVersion, version)
 			}
 		})
 	}
 }
 
 func TestResolveLocalVersion(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		chartVersion    string
@@ -256,8 +265,10 @@ func TestResolveLocalVersion(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create a temporary chart directory
 			tmpDir := t.TempDir()
 			chartFile := filepath.Join(tmpDir, "Chart.yaml")
@@ -267,39 +278,39 @@ func TestResolveLocalVersion(t *testing.T) {
 name: testchart
 version: %s
 description: Test chart
-`, tt.chartVersion)
+`, testCase.chartVersion)
 
 			err := os.WriteFile(chartFile, []byte(chartContent), 0o644)
 			if err != nil {
 				t.Fatalf("failed to create test chart: %v", err)
 			}
 
-			client := &Client{
+			client := &helmClient.Client{
 				Path: t.TempDir(), // Parent path for resolving relative paths
 			}
 
 			dep := &chart.Dependency{
 				Name:       "testchart",
-				Version:    tt.constraint,
-				Repository: LocalRepoPrefix + tmpDir,
+				Version:    testCase.constraint,
+				Repository: helmClient.LocalRepoPrefix + tmpDir,
 			}
 
-			version, err := client.resolveLocalVersion(dep)
+			version, err := client.ResolveVersion(dep)
 
-			if tt.expectedError && err == nil {
-				t.Errorf("expected error, got nil")
-			}
-			if !tt.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !tt.expectedError && version != tt.expectedVersion {
-				t.Errorf("expected version %s, got %s", tt.expectedVersion, version)
+			if testCase.expectedError {
+				require.Error(t, err)
+				assert.Empty(t, version)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, testCase.expectedVersion, version)
 			}
 		})
 	}
 }
 
 func TestResolveVersion(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		repository string
@@ -322,25 +333,27 @@ func TestResolveVersion(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			dep := &chart.Dependency{
 				Name:       "test-chart",
 				Version:    "1.0.0",
-				Repository: tt.repository,
+				Repository: testCase.repository,
 			}
 
 			// Verify the dispatcher logic works correctly
 			isOCI := ociRegistry.IsOCI(dep.Repository)
-			if isOCI != tt.isOCI {
-				t.Errorf("expected isOCI=%v, got %v for repository %s", tt.isOCI, isOCI, tt.repository)
-			}
+			assert.Equal(t, testCase.isOCI, isOCI, "expected isOCI=%v for repository %s", testCase.isOCI, testCase.repository)
 		})
 	}
 }
 
 func TestFindBestVersionMatchWithOCITags(t *testing.T) {
-	client := &Client{}
+	t.Parallel()
+
+	client := &helmClient.Client{}
 
 	tests := []struct {
 		name              string
@@ -379,18 +392,18 @@ func TestFindBestVersionMatchWithOCITags(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			version, err := client.findBestVersionMatch(tt.availableVersions, tt.constraint)
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-			if tt.expectedError && err == nil {
-				t.Errorf("expected error, got nil")
-			}
-			if !tt.expectedError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !tt.expectedError && version != tt.expectedVersion {
-				t.Errorf("expected version %s, got %s", tt.expectedVersion, version)
+			version, err := client.FindBestVersionMatch(testCase.availableVersions, testCase.constraint)
+
+			if testCase.expectedError {
+				require.Error(t, err)
+				assert.Empty(t, version)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, testCase.expectedVersion, version)
 			}
 		})
 	}
