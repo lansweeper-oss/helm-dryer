@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -205,26 +207,118 @@ entries:
 	}
 }
 
-func TestResolveVersion(t *testing.T) {
+func TestResolveLocalVersion(t *testing.T) {
 	tests := []struct {
-		name         string
-		repository   string
-		isOCI        bool
+		name            string
+		chartVersion    string
+		constraint      string
+		expectedVersion string
+		expectedError   bool
 	}{
 		{
-			name:         "HTTP repository",
-			repository:   "https://example.com/charts",
-			isOCI:        false,
+			name:            "local chart version satisfies constraint",
+			chartVersion:    "1.2.0",
+			constraint:      ">=1.0.0",
+			expectedVersion: "1.2.0",
+			expectedError:   false,
 		},
 		{
-			name:         "HTTPS repository",
-			repository:   "https://example.com/charts",
-			isOCI:        false,
+			name:          "local chart version violates constraint",
+			chartVersion:  "0.9.0",
+			constraint:    ">=1.0.0",
+			expectedError: true,
 		},
 		{
-			name:         "OCI repository with oci:// prefix",
-			repository:   "oci://registry.example.com/charts",
-			isOCI:        true,
+			name:            "local chart exact version match",
+			chartVersion:    "1.0.0",
+			constraint:      "1.0.0",
+			expectedVersion: "1.0.0",
+			expectedError:   false,
+		},
+		{
+			name:            "local chart with tilde constraint",
+			chartVersion:    "1.2.3",
+			constraint:      "~1.2.0",
+			expectedVersion: "1.2.3",
+			expectedError:   false,
+		},
+		{
+			name:          "local chart invalid version string",
+			chartVersion:  "not-a-version",
+			constraint:    ">=1.0.0",
+			expectedError: true,
+		},
+		{
+			name:          "local chart invalid constraint",
+			chartVersion:  "1.0.0",
+			constraint:    "invalid-constraint",
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary chart directory
+			tmpDir := t.TempDir()
+			chartFile := filepath.Join(tmpDir, "Chart.yaml")
+
+			// Create a valid Chart.yaml
+			chartContent := fmt.Sprintf(`apiVersion: v2
+name: testchart
+version: %s
+description: Test chart
+`, tt.chartVersion)
+
+			err := os.WriteFile(chartFile, []byte(chartContent), 0o644)
+			if err != nil {
+				t.Fatalf("failed to create test chart: %v", err)
+			}
+
+			client := &Client{
+				Path: t.TempDir(), // Parent path for resolving relative paths
+			}
+
+			dep := &chart.Dependency{
+				Name:       "testchart",
+				Version:    tt.constraint,
+				Repository: LocalRepoPrefix + tmpDir,
+			}
+
+			version, err := client.resolveLocalVersion(dep)
+
+			if tt.expectedError && err == nil {
+				t.Errorf("expected error, got nil")
+			}
+			if !tt.expectedError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !tt.expectedError && version != tt.expectedVersion {
+				t.Errorf("expected version %s, got %s", tt.expectedVersion, version)
+			}
+		})
+	}
+}
+
+func TestResolveVersion(t *testing.T) {
+	tests := []struct {
+		name       string
+		repository string
+		isOCI      bool
+	}{
+		{
+			name:       "HTTP repository",
+			repository: "https://example.com/charts",
+			isOCI:      false,
+		},
+		{
+			name:       "HTTPS repository",
+			repository: "https://example.com/charts",
+			isOCI:      false,
+		},
+		{
+			name:       "OCI repository with oci:// prefix",
+			repository: "oci://registry.example.com/charts",
+			isOCI:      true,
 		},
 	}
 
