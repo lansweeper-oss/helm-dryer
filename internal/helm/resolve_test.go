@@ -74,7 +74,7 @@ func TestFindBestVersionMatch(t *testing.T) {
 		{
 			name:              "invalid constraint",
 			availableVersions: []string{"1.0.0"},
-			constraint:        "invalid-constraint",
+			constraint:        "->~1.0.0",
 			expectedError:     true,
 		},
 		{
