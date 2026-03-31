@@ -104,9 +104,24 @@ func (h *Client) StaleDependencies() []*chart.Dependency {
 	needUpdate := []*chart.Dependency{}
 
 	for _, dependency := range h.Chart.Metadata.Dependencies {
-		slog.Debug("Checking dependency: " + dependency.Name + " version: " + dependency.Version)
+		version, err := h.ResolveVersion(dependency)
+		if err != nil {
+			slog.Warn(
+				"Failed to resolve version for dependency, will attempt update",
+				"name", dependency.Name,
+				"version", dependency.Version,
+				"repository", dependency.Repository,
+				"err", err,
+			)
 
-		exists := h.lookForArchive(dependency.Name, dependency.Version)
+			needUpdate = append(needUpdate, dependency)
+			continue
+		}
+		// Update the dependency version to the resolved one and work with that from now on.
+		dependency.Version = version
+		slog.Debug("Checking dependency: " + dependency.Name + " version: " + version)
+
+		exists := h.lookForArchive(dependency.Name, version)
 		if !exists {
 			slog.Debug("Dependency not found, triggering an update")
 
