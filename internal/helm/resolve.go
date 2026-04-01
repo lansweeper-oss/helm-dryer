@@ -115,6 +115,7 @@ func (h *Client) resolveLocalVersion(dep *chart.Dependency) (string, error) {
 
 	// Load only Chart.yaml metadata (lightweight) instead of the entire chart
 	chartFilePath := filepath.Join(localPath, "Chart.yaml")
+
 	metadata, err := chartutil.LoadChartfile(chartFilePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to load chart metadata from %s: %w", chartFilePath, err)
