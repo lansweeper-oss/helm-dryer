@@ -15,6 +15,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 )
 
+// FindBestVersionMatch returns the newest version that satisfies the given version constraint.
 func (h *Client) FindBestVersionMatch(availableVersions []string, constraint string) (string, error) {
 	// Use semver package to find best match
 	// Or iterate and find the highest version that satisfies constraint
@@ -161,7 +162,6 @@ func (h *Client) resolveOCIVersion(dep *chart.Dependency) (string, error) {
 	}
 
 	// Find the best matching version using semver constraints
-	// OCI tags are typically semantic versions
 	bestMatch, err := h.FindBestVersionMatch(tags, dep.Version)
 	if err != nil {
 		return "", errors.ErrNotFound
