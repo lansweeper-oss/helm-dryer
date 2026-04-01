@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/lansweeper-oss/helm-dryer/internal/cli"
@@ -33,6 +35,17 @@ type CLI struct {
 func (c *CLI) Run(ctx *kong.Context) error {
 	initLogger(c.Logging.Debug, c.Logging.Format)
 
+	timeout, err := time.ParseDuration(c.Timeout)
+	if err != nil {
+		return fmt.Errorf("bad timeout: %w", err)
+	}
+
+	// Create a context with configurable timeout for all network operations (downloads, rendering).
+	// This ensures that network calls and long operations don't hang indefinitely,
+	// especially important for ArgoCD CMP plugin execution which has its own timeouts.
+	requestCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	switch ctx.Command() {
 	case "get":
 		slog.Debug("Rendering values")
@@ -42,7 +55,7 @@ func (c *CLI) Run(ctx *kong.Context) error {
 			Settings: c.Settings,
 		}
 
-		err := dryer.TemplateValues()
+		err := dryer.TemplateValues(requestCtx)
 		if err != nil {
 			return fmt.Errorf("failed to render values: %w", err)
 		}
@@ -57,7 +70,7 @@ func (c *CLI) Run(ctx *kong.Context) error {
 			Settings:    c.Settings,
 		}
 
-		err := dryer.RenderFromApp()
+		err := dryer.RenderFromApp(requestCtx)
 		if err != nil {
 			return fmt.Errorf("failed to render from app: %w", err)
 		}
@@ -72,7 +85,7 @@ func (c *CLI) Run(ctx *kong.Context) error {
 			Settings:    c.Settings,
 		}
 
-		err := dryer.TemplateChart()
+		err := dryer.TemplateChart(requestCtx)
 		if err != nil {
 			return fmt.Errorf("failed to template chart: %w", err)
 		}
@@ -84,7 +97,7 @@ func (c *CLI) Run(ctx *kong.Context) error {
 			Settings: c.Settings,
 		}
 
-		err := dryer.RenderChart()
+		err := dryer.RenderChart(requestCtx)
 		if err != nil {
 			return fmt.Errorf("failed to render chart: %w", err)
 		}

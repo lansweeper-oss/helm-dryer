@@ -44,6 +44,7 @@ type Settings struct {
 	SkipCRDs             bool        `name:"skip-crds" help:"Skip CRDs in the templated output."`
 	SkipSchemaValidation bool        `help:"Disable JSON schema validation."`
 	SkipTests            bool        `help:"Skip tests from templated output."`
+	Timeout              string      `short:"T" env:"DRYER_TIMEOUT" default:"90s" help:"Operation timeout (e.g. 30s, 2m)."`
 	TTL                  string      `short:"t" env:"CACHE_TIMEOUT" help:"Time-to-live in time.Duration format."`
 	TwoPass              bool        `short:"2" help:"Experimental. Perform a two-pass render."`
 	UpdateDependencies   bool        `short:"u" help:"Always update dependencies."`

@@ -1,6 +1,7 @@
 package client_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	helmClient "github.com/lansweeper-oss/helm-dryer/internal/helm"
 	"github.com/stretchr/testify/assert"
@@ -114,7 +116,8 @@ func TestResolveHTTPVersion(t *testing.T) {
 		if strings.HasSuffix(r.URL.Path, "index.yaml") {
 			writer.Header().Set("Content-Type", "application/yaml")
 			// Valid Helm index format (YAML, no "kind" field)
-			fmt.Fprint(writer, `apiVersion: v1
+			fmt.Fprint(writer, `---
+apiVersion: v1
 entries:
   mychart:
     - name: mychart
@@ -201,7 +204,7 @@ entries:
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			version, err := client.ResolveVersion(testCase.dep)
+			version, err := client.ResolveVersion(context.Background(), testCase.dep)
 
 			if testCase.expectedError {
 				require.Error(t, err)
@@ -274,7 +277,8 @@ func TestResolveLocalVersion(t *testing.T) {
 			chartFile := filepath.Join(tmpDir, "Chart.yaml")
 
 			// Create a valid Chart.yaml
-			chartContent := fmt.Sprintf(`apiVersion: v2
+			chartContent := fmt.Sprintf(`---
+apiVersion: v2
 name: testchart
 version: %s
 description: Test chart
@@ -295,7 +299,7 @@ description: Test chart
 				Repository: helmClient.LocalRepoPrefix + tmpDir,
 			}
 
-			version, err := client.ResolveVersion(dep)
+			version, err := client.ResolveVersion(context.Background(), dep)
 
 			if testCase.expectedError {
 				require.Error(t, err)
@@ -407,4 +411,49 @@ func TestFindBestVersionMatchWithOCITags(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestResolveVersionContextTimeout simulates ArgoCD timing out when resolving chart dependencies.
+// This test verifies that context cancellation is properly respected during version resolution.
+func TestResolveVersionContextTimeout(t *testing.T) {
+	t.Parallel()
+
+	// Create a slow HTTP server that delays longer than our timeout
+	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Delay for 10 seconds - longer than the context timeout
+		time.Sleep(10 * time.Second)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+name: test-chart
+entries:
+  test-chart:
+  - version: 1.0.0
+`))
+	}))
+	defer slowServer.Close()
+
+	client := &helmClient.Client{
+		Path:  t.TempDir(),
+		Debug: false,
+	}
+
+	dependency := &chart.Dependency{
+		Name:       "test-chart",
+		Version:    "~1.0",
+		Repository: slowServer.URL,
+	}
+
+	// Create a context with a 2-second timeout (simulating ArgoCD's timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// This should fail quickly with a context timeout error, not hang for 10 seconds
+	version, err := client.ResolveVersion(ctx, dependency)
+
+	// Verify we got a context deadline error
+	require.Error(t, err, "ResolveVersion should timeout with context")
+	assert.Empty(t, version)
+
+	// The error should mention context cancellation or timeout
+	assert.Contains(t, err.Error(), "context", "Error message should reference context")
 }

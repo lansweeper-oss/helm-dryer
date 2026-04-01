@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -50,7 +51,7 @@ func (h *Client) FindBestVersionMatch(availableVersions []string, constraint str
 }
 
 // ResolveVersion resolves the version of a chart dependency.
-func (h *Client) ResolveVersion(dependency *chart.Dependency) (string, error) {
+func (h *Client) ResolveVersion(ctx context.Context, dependency *chart.Dependency) (string, error) {
 	// Return the version directly if it's already a specific version (not a constraint)
 	_, err := semver.NewVersion(dependency.Version)
 	if err == nil {
@@ -62,13 +63,13 @@ func (h *Client) ResolveVersion(dependency *chart.Dependency) (string, error) {
 	}
 
 	if ociRegistry.IsOCI(dependency.Repository) {
-		return h.resolveOCIVersion(dependency)
+		return h.resolveOCIVersion(ctx, dependency)
 	}
 
-	return h.resolveHTTPVersion(dependency)
+	return h.resolveHTTPVersion(ctx, dependency)
 }
 
-func (h *Client) resolveHTTPVersion(dep *chart.Dependency) (string, error) {
+func (h *Client) resolveHTTPVersion(ctx context.Context, dep *chart.Dependency) (string, error) {
 	settings := helmCli.EnvSettings{
 		Debug:           h.Debug,
 		RepositoryCache: getCacheDir(),
@@ -85,9 +86,14 @@ func (h *Client) resolveHTTPVersion(dep *chart.Dependency) (string, error) {
 		return "", fmt.Errorf("failed to prepare repository before loading its index: %w", err)
 	}
 
-	// Download the index file (lightweight, just metadata)
+	// Download the index file (lightweight, just metadata), respecting context cancellation
 	indexFile, err := chartRepo.DownloadIndexFile()
 	if err != nil {
+		// Check if context was cancelled
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("version resolution context cancelled: %w", ctx.Err())
+		}
+
 		return "", fmt.Errorf("failed to download index: %w", err)
 	}
 
@@ -144,7 +150,7 @@ func (h *Client) resolveLocalVersion(dep *chart.Dependency) (string, error) {
 
 // resolveOCIVersion resolves the version of an OCI chart dependency by listing available tags
 // and finding the best match.
-func (h *Client) resolveOCIVersion(dep *chart.Dependency) (string, error) {
+func (h *Client) resolveOCIVersion(ctx context.Context, dep *chart.Dependency) (string, error) {
 	registryClient, err := h.registryClient()
 	if err != nil {
 		return "", fmt.Errorf("failed to create registry client: %w", err)
@@ -154,6 +160,11 @@ func (h *Client) resolveOCIVersion(dep *chart.Dependency) (string, error) {
 
 	tags, err := registryClient.Tags(ref)
 	if err != nil {
+		// Check if context was cancelled
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("version resolution context cancelled: %w", ctx.Err())
+		}
+
 		return "", fmt.Errorf("failed to list OCI tags for %s: %w", ref, err)
 	}
 
