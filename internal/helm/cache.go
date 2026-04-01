@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Cache = "HELM_CACHE_HOME"
+	cache = "HELM_CACHE_HOME"
 )
 
 // EnsureCacheDirs ensures that the Helm cache directories exists.
@@ -22,8 +22,8 @@ func EnsureCacheDirs(path string) error {
 	cacheDir := getCacheDir()
 	chartsCacheDir := getChartsCacheDir()
 
-	if os.Getenv(Cache) == "" {
-		err := os.Setenv(Cache, cacheDir)
+	if os.Getenv(cache) == "" {
+		err := os.Setenv(cache, cacheDir)
 		if err != nil {
 			slog.Warn(
 				"Helm cache directory falls back to /.cache, ensure this is writable or set HELM_CACHE_HOME",
@@ -57,7 +57,7 @@ func GetArchiveName(name, version string) string {
 
 // getCacheDir returns the directory where Helm caches its charts.
 func getCacheDir() string {
-	return utils.GetEnv(Cache, filepath.Join(os.TempDir(), "helm-cache"))
+	return utils.GetEnv(cache, filepath.Join(os.TempDir(), "helm-cache"))
 }
 
 func getChartsCacheDir() string {
