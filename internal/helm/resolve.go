@@ -8,7 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/lansweeper-oss/helm-dryer/internal/errors"
 	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/getter"
 	ociRegistry "helm.sh/helm/v3/pkg/registry"
@@ -113,12 +113,14 @@ func (h *Client) resolveLocalVersion(dep *chart.Dependency) (string, error) {
 
 	localPath = filepath.Clean(localPath)
 
-	localChart, err := loader.LoadDir(localPath)
+	// Load only Chart.yaml metadata (lightweight) instead of the entire chart
+	chartFilePath := filepath.Join(localPath, "Chart.yaml")
+	metadata, err := chartutil.LoadChartfile(chartFilePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to load local chart from %s: %w", localPath, err)
+		return "", fmt.Errorf("failed to load chart metadata from %s: %w", chartFilePath, err)
 	}
 
-	localVersion := localChart.Metadata.Version
+	localVersion := metadata.Version
 
 	// Validate that the local chart's version satisfies the constraint
 	versionConstraint, err := semver.NewConstraint(dep.Version)
