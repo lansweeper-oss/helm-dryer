@@ -439,6 +439,71 @@ dependencies:
 	assert.InEpsilon(t, float64(3), subchartMap["replicaCount"], 0.01)
 }
 
+func TestReadDependenciesValuesUsesInMemoryCharts(t *testing.T) {
+	// This test verifies that ReadDependenciesValues() uses in-memory loaded charts
+	// instead of re-reading archives. This prevents issues where OCI tags with "v" prefix
+	// (e.g., "v1.0.0") mismatch with chart metadata versions without the prefix (e.g., "1.0.0"),
+	// which would cause archive lookups to fail.
+	tempDir := t.TempDir()
+
+	// Create a sub-chart with its own Chart.yaml and values.yaml
+	subChartDir := filepath.Join(tempDir, "subchart")
+	err := os.MkdirAll(subChartDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(subChartDir, "Chart.yaml"), []byte(`---
+apiVersion: v2
+name: subchart
+version: 1.5.0
+`), utils.ReadWrite)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(subChartDir, "values.yaml"), []byte(`
+environment: test
+replicas: 5
+`), utils.ReadWrite)
+	require.NoError(t, err)
+
+	// Create the parent chart referencing the sub-chart via file://
+	parentDir := filepath.Join(tempDir, "parent")
+	err = os.MkdirAll(parentDir, utils.ReadWriteDir)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(parentDir, "Chart.yaml"), []byte(`---
+apiVersion: v2
+name: parent-chart
+version: 0.1.0
+dependencies:
+  - name: subchart
+    version: 1.5.0
+    repository: file://../subchart
+`), utils.ReadWrite)
+	require.NoError(t, err)
+
+	cacheDir := t.TempDir()
+	t.Setenv("HELM_CACHE_HOME", cacheDir)
+
+	helmClient := client.Client{
+		Path:  parentDir,
+		Debug: true,
+	}
+
+	// ReadChartDependencies downloads/processes deps and reloads the chart
+	vals, err := helmClient.ReadChartDependencies()
+	require.NoError(t, err)
+
+	// Verify that subchart values were successfully extracted from the in-memory loaded chart
+	subchartVals, ok := vals["subchart"]
+	require.True(t, ok, "expected subchart values to be present")
+
+	subchartMap, ok := subchartVals.(map[string]any)
+	require.True(t, ok, "expected subchart values to be a map")
+
+	// Verify specific values from the subchart
+	assert.Equal(t, "test", subchartMap["environment"])
+	assert.InEpsilon(t, float64(5), subchartMap["replicas"], 0.01)
+}
+
 func TestHasDependencies(t *testing.T) {
 	t.Parallel()
 

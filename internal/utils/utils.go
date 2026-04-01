@@ -71,7 +71,7 @@ func CopyFile(src, dst string) error {
 		return fmt.Errorf("failed to read file %s: %w", src, err)
 	}
 
-	err = os.WriteFile(dst, data, ReadWrite)
+	err = os.WriteFile(dst, data, ReadWrite) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("failed to write destination file %s: %w", dst, err)
 	}

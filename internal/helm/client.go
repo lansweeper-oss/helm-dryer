@@ -104,9 +104,25 @@ func (h *Client) StaleDependencies() []*chart.Dependency {
 	needUpdate := []*chart.Dependency{}
 
 	for _, dependency := range h.Chart.Metadata.Dependencies {
-		slog.Debug("Checking dependency: " + dependency.Name + " version: " + dependency.Version)
+		version, err := h.ResolveVersion(dependency)
+		if err != nil {
+			slog.Warn(
+				"Failed to resolve version for dependency, will attempt update",
+				"name", dependency.Name,
+				"version", dependency.Version,
+				"repository", dependency.Repository,
+				"err", err,
+			)
 
-		exists := h.lookForArchive(dependency.Name, dependency.Version)
+			needUpdate = append(needUpdate, dependency)
+
+			continue
+		}
+		// Update the dependency version to the resolved one and work with that from now on.
+		dependency.Version = version
+		slog.Debug("Checking dependency: " + dependency.Name + " version: " + version)
+
+		exists := h.lookForArchive(dependency.Name, version)
 		if !exists {
 			slog.Debug("Dependency not found, triggering an update")
 
@@ -197,31 +213,12 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 // It reads the values files from the dependencies and merges them into a single map where the
 // root keys are the names of the dependencies.
 func (h *Client) ReadDependenciesValues() (map[string]any, error) {
-	dir := filepath.Join(h.Path, ChartsFolder)
 	vals := map[string]any{}
 
 	for _, dependency := range h.Chart.Dependencies() {
 		slog.Debug("Reading values for dependency", "name", dependency.Metadata.Name)
-		archive := fmt.Sprintf("%s-%s.tgz", dependency.Metadata.Name, dependency.Metadata.Version)
-		fullPath := filepath.Join(dir, archive)
 
-		file, err := os.Open(filepath.Clean(fullPath))
-		if err != nil {
-			return nil, fmt.Errorf("failed to open dependency chart %s: %w", fullPath, err)
-		}
-
-		depChart, err := loader.LoadArchive(file)
-
-		closeErr := file.Close()
-		if closeErr != nil && err == nil {
-			slog.Warn("failed to close dependency chart", "path", fullPath, "err", closeErr)
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to load dependency chart %s: %w", fullPath, err)
-		}
-
-		if depValues := depChart.Values; len(depValues) > 0 {
+		if depValues := dependency.Values; len(depValues) > 0 {
 			if _, exists := vals[dependency.Metadata.Name]; !exists {
 				vals[dependency.Metadata.Name] = depValues
 			}

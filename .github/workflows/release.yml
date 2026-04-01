@@ -4,7 +4,7 @@ defaults:
   run:
     shell: bash
 env:
-  go_version: '1.26.0'
+  go_version: '1.26.1'
 on:
   push:
     branches:
