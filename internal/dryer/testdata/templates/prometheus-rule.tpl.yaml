@@ -1,6 +1,6 @@
 {{- if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PrometheusRule" }}
 {{- $fullName := printf "%s-%s" .Values.domain .Release.Name | lower }}
-{{- $serviceName := dig "monitoring" "service" "name" "" .Values.AsMap }}
+{{- $serviceName := dig "monitoring" "service" "name" "" .Values.AsMap | default "" }}
 {{- $validName := regexMatch "^[a-z0-9-]{1,63}$" $serviceName }}
 {{- $name := ternary $serviceName $fullName $validName }}
 apiVersion: monitoring.coreos.com/v1

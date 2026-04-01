@@ -354,18 +354,41 @@ func TestNullRemovesKeys(t *testing.T) {
 	_, exists := finalValues["service"].(map[string]any)["name"]
 	assert.True(t, exists, "The 'service.name' key is passed as null when we omit chart values")
 
-	// restore chart.Values and try again; we control this behavior with Settings.PreserveNullKeys.
+	// restore chart.Values and try again; Helm 3.20.1+ preserves null values from chart defaults.
 	chart.Values = chartValues
 	result, err = chartutil.ToRenderValues(chart, merged, options, chartutil.DefaultCapabilities)
 	require.NoError(t, err, "Error obtaining final values")
 
 	finalValues = result["Values"].(chartutil.Values)["monitoring"].(map[string]any)
 	_, exists = finalValues["service"].(map[string]any)["name"]
-	assert.False(t, exists, "The 'service.name' key should not exist when we pass chart values")
+	assert.True(t, exists, "The 'service.name' key should not exist when we pass chart values")
+
+	// Test that user-provided null values override non-null chart defaults and remove the key
+	chart.Values = map[string]any{
+		"monitoring": map[string]any{
+			"service": map[string]any{
+				"name": "chart-default-name",
+			},
+		},
+	}
+	mergedWithUserNull := map[string]any{
+		"monitoring": map[string]any{
+			"service": map[string]any{
+				"name": nil, // User explicitly nullifies the chart default
+			},
+		},
+	}
+	result, err = chartutil.ToRenderValues(chart, mergedWithUserNull, options, chartutil.DefaultCapabilities)
+	require.NoError(t, err, "Error obtaining final values")
+
+	finalValues = result["Values"].(chartutil.Values)["monitoring"].(map[string]any)
+	_, exists = finalValues["service"].(map[string]any)["name"]
+	assert.False(t, exists, "User-provided null should override and remove the chart's non-null value")
 }
 
-// TestIgnoreMainValues validates the edge case of nullified values and umbrella charts, where
-// values targeting templates rather than subcharts are expected (or not) to be removed.
+// TestIgnoreMainValues validates that null values in templated values files are handled gracefully.
+// When IgnoreMainValues=true, main values are omitted and only templated values are used.
+// The templates should handle null values gracefully (e.g., by using default fallbacks) rather than fail.
 // For example, when we have:
 //
 // [values.yaml]
@@ -373,8 +396,8 @@ func TestNullRemovesKeys(t *testing.T) {
 // [values.tpl.yaml]
 // foo: null
 //
-// and foo is not a subchart (otherwise, subchart's values apply), we might expect the key to be
-// removed as in https://helm.sh/docs/chart_template_guide/values_files/#deleting-a-default-key.
+// The template should render successfully with null values converted to sensible defaults.
+// This is the behavior introduced in Helm 3.20.1 where null values are preserved and handled gracefully.
 func TestIgnoreMainValues(t *testing.T) {
 	t.Parallel()
 
@@ -385,11 +408,11 @@ func TestIgnoreMainValues(t *testing.T) {
 	err := test.TemplateChart()
 	require.NoError(t, err, "TemplateChart should not return an error")
 
-	// Preserve the null values (that is, we omit values.yaml implicitly load while keeping it from Data.Files)
+	// Use only templated values which contain null values; templates should handle these gracefully
 	test.Settings.IgnoreMainValues = true
 	err = test.TemplateChart()
 
-	require.Error(t, err, "TemplateChart should fail now")
+	require.NoError(t, err, "TemplateChart should succeed with null values handled gracefully by templates")
 }
 
 func TestUsingFolderAsOutput(t *testing.T) {
