@@ -113,4 +113,4 @@ jobs:
         tag_name: ${{ steps.tag.outputs.tag }}
         name: ${{ steps.tag.outputs.tag }}
         body: ${{ steps.tag-from-git.outputs.changelog }}
-        files: ${{ steps.build-binaries.outputs.binaries }}
+        files: ${{ steps.build-binaries.outputs.archives }}
