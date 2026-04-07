@@ -405,12 +405,12 @@ When running `dryer` container with a `readOnlyRootFilesystem: true` security co
         - mountPath: /tmp
           name: cmp-tmp
     volumes:
-    - emptyDir: {}
-      name: cmp-tmp
-    - emptyDir: {}
-      name: helm-config
-    - emptyDir: {}
-      name: helm-working-dir
+      - emptyDir: {}
+        name: cmp-tmp
+      - emptyDir: {}
+        name: helm-config
+      - emptyDir: {}
+        name: helm-working-dir
 [...]
 ```
 
@@ -466,11 +466,14 @@ The easiest way to add it is by setting the following values in the ArgoCD Helm 
 repoServer:
   extraContainers:
   - name: dryer-plugin
-    command: [/var/run/argocd/argocd-cmp-server]
+    command:
+    - /var/run/argocd/argocd-cmp-server
+    args:
+    - --loglevel=info # print everything written by the CMP, even on successful command execution
     image: ghcr.io/lansweeper-oss/helm-dryer/helm-dryer:v1.0.0
     env:
-      - name: HELM_CACHE_HOME
-        value: /helm-working-dir
+    - name: HELM_CACHE_HOME
+      value: /tmp/helm-cache
     resources:
       requests:
         ephemeral-storage: "10Gi"
@@ -480,19 +483,17 @@ repoServer:
       runAsNonRoot: true
       runAsUser: 999
     volumeMounts:
-      - mountPath: /var/run/argocd
-        name: var-files
-      - mountPath: /home/argocd/cmp-server/plugins
-        name: plugins
-      - mountPath: /home/argocd/cmp-server/config/plugin.yaml
-        subPath: dryer.yaml
-        name: plugin-config
-      - mountPath: /tmp
-        name: cmp-tmp
-      - mountPath: /.config
-        name: helm-config
-      - mountPath: /helm-working-dir
-        name: helm-working-dir
+    - mountPath: /var/run/argocd
+      name: var-files
+    - mountPath: /home/argocd/cmp-server/plugins
+      name: plugins
+    - mountPath: /home/argocd/cmp-server/config/plugin.yaml
+      subPath: dryer.yaml
+      name: plugin-config
+    - mountPath: /tmp
+      name: cmp-tmp
+    - mountPath: /.config
+      name: helm-config
   volumes:
   - configMap:
       name: argocd-cmp-cm
@@ -501,8 +502,6 @@ repoServer:
     name: cmp-tmp
   - emptyDir: {}
     name: helm-config
-  - emptyDir: {}
-    name: helm-working-dir
   cmp:
     create: true
     plugins:
@@ -517,15 +516,15 @@ repoServer:
         discover: {}
         parameters:
           static:
-            - name: settings
-              collectionType: map
-              title: Plugin Settings
-            - name: valueFiles
-              collectionType: array
-              title: Values Files
-            - name: valuesObject
-              collectionType: map
-              title: Injected Values
+          - name: settings
+            collectionType: map
+            title: Plugin Settings
+          - name: valueFiles
+            collectionType: array
+            title: Values Files
+          - name: valuesObject
+            collectionType: map
+            title: Injected Values
 ```
 
 ## Build
