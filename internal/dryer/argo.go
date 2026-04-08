@@ -51,7 +51,7 @@ func (in *Input) ReadParameters(parameters []argo.Parameter) {
 	}
 }
 
-// Read "settings" paramenter map and sets the corresponding fields in the struct.
+// Read "settings" parameter map and sets the corresponding fields in the struct.
 func (in *Input) readSettingsParameters(param *argo.Parameter) {
 	if val, ok := param.Map["disableHooks"]; ok {
 		in.AppSettings.DisableHooks = utils.ToBoolean(val)
