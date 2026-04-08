@@ -209,6 +209,8 @@ Flags:
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
+  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
+                                   ($DRYER_TIMEOUT).
   -t, --ttl=STRING                 Time-to-live in time.Duration format
                                    ($CACHE_TIMEOUT).
   -2, --two-pass                   Experimental. Perform a two-pass render.
@@ -274,6 +276,8 @@ Flags:
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
+  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
+                                   ($DRYER_TIMEOUT).
   -t, --ttl=STRING                 Time-to-live in time.Duration format
                                    ($CACHE_TIMEOUT).
   -2, --two-pass                   Experimental. Perform a two-pass render.
@@ -336,6 +340,8 @@ Flags:
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
+  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
+                                   ($DRYER_TIMEOUT).
   -t, --ttl=STRING                 Time-to-live in time.Duration format
                                    ($CACHE_TIMEOUT).
   -2, --two-pass                   Experimental. Perform a two-pass render.
@@ -394,6 +400,8 @@ Flags:
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
+  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
+                                   ($DRYER_TIMEOUT).
   -t, --ttl=STRING                 Time-to-live in time.Duration format
                                    ($CACHE_TIMEOUT).
   -2, --two-pass                   Experimental. Perform a two-pass render.
@@ -487,6 +495,8 @@ Flags:
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
+  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
+                                   ($DRYER_TIMEOUT).
   -t, --ttl=STRING                 Time-to-live in time.Duration format
                                    ($CACHE_TIMEOUT).
   -2, --two-pass                   Experimental. Perform a two-pass render.
