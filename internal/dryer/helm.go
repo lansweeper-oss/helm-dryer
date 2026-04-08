@@ -1,6 +1,7 @@
 package dryer
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -30,20 +31,20 @@ func (in *Input) UsingFolderAsOutput() bool {
 // It reads the values files, merges them with the provided values, and
 // then renders the chart using the Helm client.
 // The rendered chart is written to the specified output file or to stdout if no output file is specified.
-func (in *Input) RenderChart() error {
+func (in *Input) RenderChart(ctx context.Context) error {
 	// Override from parameters
 	err := in.ReadEnvironment()
 	if err != nil {
 		return fmt.Errorf("error reading environment: %w", err)
 	}
 
-	return in.TemplateChart()
+	return in.TemplateChart(ctx)
 }
 
 // TemplateChart renders the chart using the provided values and settings.
 // It reads the values files, merges them with the provided values, and
 // then renders the chart using the Helm client.
-func (in *Input) TemplateChart() error {
+func (in *Input) TemplateChart(ctx context.Context) error {
 	helmClient := client.Client{
 		Credentials:        &in.Settings.Credentials,
 		Debug:              in.Settings.Logging.Debug,
@@ -52,7 +53,7 @@ func (in *Input) TemplateChart() error {
 		UpdateDependencies: in.Settings.UpdateDependencies,
 	}
 
-	vals, err := helmClient.ReadChartDependencies()
+	vals, err := helmClient.ReadChartDependencies(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read chart dependencies: %w", err)
 	}

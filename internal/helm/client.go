@@ -3,6 +3,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -96,7 +97,7 @@ func TemplateAndParseYaml(
 }
 
 // StaleDependencies returns which Helm chart dependencies need an update.
-func (h *Client) StaleDependencies() []*chart.Dependency {
+func (h *Client) StaleDependencies(ctx context.Context) []*chart.Dependency {
 	if h.UpdateDependencies {
 		return h.Chart.Metadata.Dependencies
 	}
@@ -104,7 +105,7 @@ func (h *Client) StaleDependencies() []*chart.Dependency {
 	needUpdate := []*chart.Dependency{}
 
 	for _, dependency := range h.Chart.Metadata.Dependencies {
-		version, err := h.ResolveVersion(dependency)
+		version, err := h.ResolveVersion(ctx, dependency)
 		if err != nil {
 			slog.Warn(
 				"Failed to resolve version for dependency, will attempt update",
@@ -156,7 +157,7 @@ func (h *Client) LoadChart() error {
 
 // ReadChartDependencies loads the Chart (by ignoring any templated values file), goes through its
 // dependencies, update if needed and obtains the values from those.
-func (h *Client) ReadChartDependencies() (map[string]any, error) {
+func (h *Client) ReadChartDependencies(ctx context.Context) (map[string]any, error) {
 	err := EnsureCacheDirs(h.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure cache directory: %w", err)
@@ -175,10 +176,10 @@ func (h *Client) ReadChartDependencies() (map[string]any, error) {
 
 	h.deduplicateDependencies()
 
-	dependenciesToUpdate := h.StaleDependencies()
+	dependenciesToUpdate := h.StaleDependencies(ctx)
 
 	if len(dependenciesToUpdate) > 0 {
-		err = h.UpdateDeps(dependenciesToUpdate)
+		err = h.UpdateDeps(ctx, dependenciesToUpdate)
 		if err != nil {
 			return nil, fmt.Errorf("could not update dependencies: %w", err)
 		}
@@ -229,7 +230,8 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 }
 
 // UpdateDeps updates the dependencies of a Helm chart located at the specified path.
-func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
+// It respects the provided context for cancellation and timeout.
+func (h *Client) UpdateDeps(ctx context.Context, dependencies []*chart.Dependency) error {
 	chartsDir := filepath.Join(h.Path, ChartsFolder)
 
 	downloader, err := h.chartDownloader()
@@ -240,6 +242,13 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 	settings := h.envSettings()
 
 	for _, dep := range dependencies {
+		// Check context before processing each dependency
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("dependency download cancelled: %w", ctx.Err())
+		default:
+		}
+
 		switch {
 		case strings.HasPrefix(dep.Repository, LocalRepoPrefix):
 			err = h.packageLocalDependency(dep, chartsDir)
@@ -247,7 +256,7 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 			ref := strings.TrimRight(dep.Repository, "/") + "/" + dep.Name
 			slog.Debug("Downloading OCI dependency", "ref", ref, "version", dep.Version)
 
-			err = downloadAndStandardize(downloader, ref, dep, chartsDir)
+			err = downloadAndStandardize(ctx, downloader, ref, dep, chartsDir)
 
 		default:
 			var chartURL string
@@ -265,7 +274,7 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 
 			slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
 
-			err = downloadAndStandardize(downloader, chartURL, dep, chartsDir)
+			err = downloadAndStandardize(ctx, downloader, chartURL, dep, chartsDir)
 		}
 
 		if err != nil {
@@ -281,10 +290,24 @@ func (h *Client) UpdateDeps(dependencies []*chart.Dependency) error {
 // downloadAndStandardize downloads a chart and renames the resulting archive to
 // the canonical format: <name>-<version>.tgz. This handles OCI registries and
 // HTTP repos that may produce non-standard filenames (e.g. suffixes like "-helm"
-// or version prefixes like "v").
-func downloadAndStandardize(dl *downloader.ChartDownloader, ref string, dep *chart.Dependency, destDir string) error {
-	downloadedPath, _, err := dl.DownloadTo(ref, dep.Version, destDir)
+// or version prefixes like "v"). It respects the provided context for cancellation.
+func downloadAndStandardize(
+	ctx context.Context, downloader *downloader.ChartDownloader, ref string, dep *chart.Dependency, destDir string,
+) error {
+	// Check context before starting download
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("download cancelled: %w", ctx.Err())
+	default:
+	}
+
+	downloadedPath, _, err := downloader.DownloadTo(ref, dep.Version, destDir)
 	if err != nil {
+		// Check if context was cancelled during download
+		if ctx.Err() != nil {
+			return fmt.Errorf("download cancelled: %w", ctx.Err())
+		}
+
 		return fmt.Errorf("failed to download %s: %w", ref, err)
 	}
 

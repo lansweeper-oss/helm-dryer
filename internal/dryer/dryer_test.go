@@ -2,6 +2,7 @@ package dryer_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -108,7 +109,7 @@ func TestTemplateValues(t *testing.T) {
 
 	test := setupTest(t, testFiles)
 
-	err := test.TemplateValues()
+	err := test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -136,7 +137,7 @@ func TestTemplateValues(t *testing.T) {
 	}
 
 	test.Settings.Path = tempDir
-	err = test.TemplateValues()
+	err = test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error for raw file")
 }
 
@@ -148,7 +149,7 @@ func TestTemplateWithCustomDelims(t *testing.T) {
 	test.Settings.DelimLeft = "<<"
 	test.Settings.DelimRight = ">>"
 
-	err := test.TemplateValues()
+	err := test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -176,7 +177,7 @@ func TestTemplateWithCustomDelims(t *testing.T) {
 	}
 
 	test.Settings.Path = tempDir
-	err = test.TemplateValues()
+	err = test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error for raw file")
 }
 
@@ -185,7 +186,7 @@ func TestTemplateCapabilities(t *testing.T) {
 
 	test := setupTest(t, testFilesWithCapabilities)
 
-	err := test.TemplateValues()
+	err := test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -208,7 +209,7 @@ func Test2PassTemplateValues(t *testing.T) {
 
 	test.Settings.TwoPass = true
 
-	err := test.TemplateValues()
+	err := test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues` should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -232,7 +233,7 @@ func TestTemplateChart(t *testing.T) {
 	test.Data.Set["tags.foobar"] = "true"
 	test.Settings.SkipCRDs = true
 
-	err := test.TemplateChart()
+	err := test.TemplateChart(context.Background())
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -269,11 +270,11 @@ func TestSkipSchema(t *testing.T) {
 
 	test := setupTest(t, testFilesInvalidSchema)
 
-	err := test.TemplateChart()
+	err := test.TemplateChart(context.Background())
 	require.Error(t, err, "TemplateChart should return an error when SkipSchemaValidation=False")
 
 	test.Settings.SkipSchemaValidation = true
-	err = test.TemplateChart()
+	err = test.TemplateChart(context.Background())
 	require.NoError(t, err, "TemplateChart should not return an error when SkipSchemaValidation=True")
 }
 
@@ -285,7 +286,7 @@ func TestSkipTestHooks(t *testing.T) {
 	test.Data.Set["tags.hello"] = "true"
 	test.Settings.SkipTests = true
 
-	err := test.TemplateChart()
+	err := test.TemplateChart(context.Background())
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -322,7 +323,7 @@ func TestNullRemovesKeys(t *testing.T) {
 
 	test := setupTest(t, testFiles)
 
-	err := test.TemplateValues()
+	err := test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	merged, err := utils.ParseYAMLFile(test.Settings.Out)
@@ -405,12 +406,12 @@ func TestIgnoreMainValues(t *testing.T) {
 
 	test.Data.Set["tags.hello"] = "true"
 
-	err := test.TemplateChart()
+	err := test.TemplateChart(context.Background())
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	// Use only templated values which contain null values; templates should handle these gracefully
 	test.Settings.IgnoreMainValues = true
-	err = test.TemplateChart()
+	err = test.TemplateChart(context.Background())
 
 	require.NoError(t, err, "TemplateChart should succeed with null values handled gracefully by templates")
 }
@@ -423,7 +424,7 @@ func TestUsingFolderAsOutput(t *testing.T) {
 	test.Data.Set["tags.hello"] = "true"
 	test.Settings.Out = t.TempDir()
 
-	err := test.TemplateChart()
+	err := test.TemplateChart(context.Background())
 	require.NoError(t, err, "TemplateChart should not return an error")
 
 	files, err := os.ReadDir(filepath.Join(test.Settings.Out, "test-chart", "charts", "hello-world", "templates"))
@@ -467,7 +468,7 @@ func TestRenderChartAsCMP(t *testing.T) {
 		]`,
 	)
 
-	err := test.RenderChart()
+	err := test.RenderChart(context.Background())
 	require.NoError(t, err, "RenderChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -547,7 +548,7 @@ func TestTwoPassRenderChartAsCMP(t *testing.T) {
 		]`,
 	)
 
-	err := test.RenderChart()
+	err := test.RenderChart(context.Background())
 	require.NoError(t, err, "RenderChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -612,7 +613,7 @@ func TestTwoPassWithDependencies(t *testing.T) {
 		]`,
 	)
 
-	err := test.RenderChart()
+	err := test.RenderChart(context.Background())
 	require.NoError(t, err, "RenderChart should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -714,7 +715,7 @@ spec:
 	// Set the application spec file in the CLI and do an override
 	test.AppSettings.ApplicationSpec = tmpfile.Name()
 
-	err = test.RenderFromApp()
+	err = test.RenderFromApp(context.Background())
 	require.NoError(t, err, "RenderFromApp should not return an error")
 
 	yamlFile, err := os.ReadFile(test.Settings.Out)
@@ -783,7 +784,7 @@ func TestSetOverridesFiles(t *testing.T) {
 	test.Data.Set["foo-bar.logLevel"] = "debug"
 	test.Data.Set["foo-bar.serviceMonitor.enabled"] = "false"
 
-	err := test.TemplateValues()
+	err := test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
 
 	out, err := utils.ParseYAMLFile(test.Settings.Out)
