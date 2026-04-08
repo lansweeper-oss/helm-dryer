@@ -2,6 +2,7 @@
 package dryer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -36,7 +37,7 @@ var kubeVersionPattern = regexp.MustCompile(`^v?\d+\.\d+(\..+)?$`)
 //     Application spec is relative to the one set as a parameter.
 //     This is useful for CI, where the path may be set differently when comparing HEAD with the
 //     main branch.
-func (in *Input) RenderFromApp() error {
+func (in *Input) RenderFromApp(ctx context.Context) error {
 	content, err := os.ReadFile(in.AppSettings.ApplicationSpec)
 	if err != nil {
 		return fmt.Errorf("failed to read application spec file %s: %w", in.AppSettings.ApplicationSpec, err)
@@ -69,7 +70,7 @@ func (in *Input) RenderFromApp() error {
 	// Override from parameters
 	in.ReadParameters(app.Spec.Source.Plugin.Parameters)
 
-	err = in.TemplateChart()
+	err = in.TemplateChart(ctx)
 	if err != nil {
 		return fmt.Errorf("error rendering application: %w", err)
 	}
@@ -79,7 +80,7 @@ func (in *Input) RenderFromApp() error {
 
 // TemplateValues generates a YAML file with the merged values from the provided files and the set values.
 // It writes the output to the specified file or to stdout if no output file is specified.
-func (in *Input) TemplateValues() error {
+func (in *Input) TemplateValues(ctx context.Context) error {
 	vals := make(map[string]any)
 	chartFilePath := filepath.Join(in.Settings.Path, "Chart.yaml")
 
@@ -97,7 +98,7 @@ func (in *Input) TemplateValues() error {
 			slog.Warn("Unexpected error checking Chart.yaml", "path", chartFilePath, "error", err)
 		}
 
-		vals, err = helmClient.ReadChartDependencies()
+		vals, err = helmClient.ReadChartDependencies(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to read chart dependencies: %w", err)
 		}

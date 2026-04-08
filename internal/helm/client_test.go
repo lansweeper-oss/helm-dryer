@@ -1,6 +1,7 @@
 package client_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,7 +39,7 @@ dependencies:
 	require.NoError(t, err, "Failed to load chart")
 
 	// Test case: returns the missing dependency when archive is absent
-	staleDeps := helmClient.StaleDependencies()
+	staleDeps := helmClient.StaleDependencies(context.Background())
 	require.Len(t, staleDeps, 1, "should return the missing dependency")
 	assert.Equal(t, "redis", staleDeps[0].Name)
 
@@ -52,13 +53,13 @@ dependencies:
 	require.NoError(t, err, "Failed to create dependency file")
 
 	// Test case: returns all deps when TTL is zero (caching disabled)
-	staleDeps = helmClient.StaleDependencies()
+	staleDeps = helmClient.StaleDependencies(context.Background())
 	assert.Len(t, staleDeps, 1, "should return all deps when TTL is zero (caching disabled)")
 
 	// Test case: returns empty slice when all dependencies exist and TTL is not expired.
 	// h.TTL field represents a cutoff time, files modified after this time are considered valid.
 	helmClient.TTL = time.Now().Add(-10 * time.Minute)
-	staleDeps = helmClient.StaleDependencies()
+	staleDeps = helmClient.StaleDependencies(context.Background())
 	assert.Empty(t, staleDeps, "should return empty slice when all deps are fresh")
 }
 
@@ -117,7 +118,7 @@ dependencies:
 
 	// Only update subchart-b (the stale one)
 	staleDep := helmClient.Chart.Metadata.Dependencies[1]
-	err = helmClient.UpdateDeps([]*chart.Dependency{staleDep})
+	err = helmClient.UpdateDeps(context.Background(), []*chart.Dependency{staleDep})
 	require.NoError(t, err)
 
 	// Verify subchart-b was downloaded
@@ -151,7 +152,7 @@ version: 0.1.0
 	err = helmClient.LoadChart()
 	require.NoError(t, err)
 
-	err = helmClient.UpdateDeps([]*chart.Dependency{
+	err = helmClient.UpdateDeps(context.Background(), []*chart.Dependency{
 		{Name: "nonexistent", Version: "1.0.0", Repository: "https://invalid.example.com/charts"},
 	})
 	require.Error(t, err, "should fail for invalid repository URL")
@@ -198,7 +199,7 @@ dependencies:
 	err = os.WriteFile(filepath.Join(chartsDir, "postgres-15.0.0.tgz"), []byte("dummy"), utils.ReadWrite)
 	require.NoError(t, err)
 
-	staleDeps := helmClient.StaleDependencies()
+	staleDeps := helmClient.StaleDependencies(context.Background())
 	require.Len(t, staleDeps, 1, "should return only the missing dependency")
 	assert.Equal(t, "nginx", staleDeps[0].Name)
 }
@@ -266,7 +267,7 @@ dependencies:
 		Debug:       true,
 		Path:        tempDir,
 	}
-	_, err = helmClient.ReadChartDependencies()
+	_, err = helmClient.ReadChartDependencies(context.Background())
 	require.NoError(t, err, "ReadChartDependencies should not return an error")
 	// Verify that the gitlab dependency file exists
 	archiveFile := client.GetArchiveName(chartName, chartVersion)
@@ -278,7 +279,7 @@ dependencies:
 	helmClient.TTL = time.Time{}
 
 	// Call ReadChartDependencies again to simulate updating dependencies
-	_, err = helmClient.ReadChartDependencies()
+	_, err = helmClient.ReadChartDependencies(context.Background())
 	require.NoError(t, err, "ReadChartDependencies should not return an error")
 
 	// Get the modification time of the dependency file after updating
@@ -295,7 +296,7 @@ dependencies:
 
 	// Test case: Invalid chart path
 	helmClient.Path = "invalid-path"
-	_, err = helmClient.ReadChartDependencies()
+	_, err = helmClient.ReadChartDependencies(context.Background())
 	require.Error(t, err, "ReadChartDependencies should return an error for an invalid chart path")
 }
 
@@ -342,7 +343,7 @@ dependencies:
 	err = helmClient.LoadChart()
 	require.NoError(t, err, "Failed to load chart")
 
-	err = helmClient.UpdateDeps(helmClient.Chart.Metadata.Dependencies)
+	err = helmClient.UpdateDeps(context.Background(), helmClient.Chart.Metadata.Dependencies)
 	require.NoError(t, err, "UpdateDeps should not return an error")
 
 	// Verify that the dependency file was retrieved
@@ -425,7 +426,7 @@ dependencies:
 		Debug: true,
 	}
 
-	vals, err := helmClient.ReadChartDependencies()
+	vals, err := helmClient.ReadChartDependencies(context.Background())
 	require.NoError(t, err)
 
 	// Without the reload after UpdateDeps, Dependencies() would be empty
@@ -489,7 +490,7 @@ dependencies:
 	}
 
 	// ReadChartDependencies downloads/processes deps and reloads the chart
-	vals, err := helmClient.ReadChartDependencies()
+	vals, err := helmClient.ReadChartDependencies(context.Background())
 	require.NoError(t, err)
 
 	// Verify that subchart values were successfully extracted from the in-memory loaded chart
@@ -576,7 +577,7 @@ dependencies:
 		Debug: true,
 	}
 
-	vals, err := helmClient.ReadChartDependencies()
+	vals, err := helmClient.ReadChartDependencies(context.Background())
 	require.NoError(t, err)
 
 	// Dedup removes the aliased duplicate; only the original entry remains.
@@ -619,7 +620,7 @@ dependencies:
 	err = helmClient.LoadChart()
 	require.NoError(t, err)
 
-	staleDeps := helmClient.StaleDependencies()
+	staleDeps := helmClient.StaleDependencies(context.Background())
 	assert.Len(t, staleDeps, 2, "force update should return all dependencies")
 }
 
@@ -660,7 +661,7 @@ dependencies:
 	require.NoError(t, err)
 
 	// StaleDependencies should find the archive in cache, copy it to charts/, and return empty
-	staleDeps := helmClient.StaleDependencies()
+	staleDeps := helmClient.StaleDependencies(context.Background())
 	assert.Empty(t, staleDeps, "should not be stale when archive exists in cache")
 
 	// Verify the archive was copied from cache to charts/
@@ -711,7 +712,7 @@ dependencies:
 	err = helmClient.LoadChart()
 	require.NoError(t, err)
 
-	staleDeps := helmClient.StaleDependencies()
+	staleDeps := helmClient.StaleDependencies(context.Background())
 	require.Len(t, staleDeps, 1, "should be stale when cache is expired")
 	assert.Equal(t, "mylib", staleDeps[0].Name)
 
@@ -762,7 +763,7 @@ dependencies:
 	err = helmClient.LoadChart()
 	require.NoError(t, err)
 
-	err = helmClient.UpdateDeps(helmClient.Chart.Metadata.Dependencies)
+	err = helmClient.UpdateDeps(context.Background(), helmClient.Chart.Metadata.Dependencies)
 	require.NoError(t, err)
 
 	archive := filepath.Join(chartsDir, "absolute-sub-0.3.0.tgz")
