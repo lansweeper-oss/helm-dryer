@@ -8,10 +8,12 @@ type AppSettings struct {
 
 // Credentials holds the configuration for OCI registry credentials.
 type Credentials struct {
-	File     string `type:"existingfile" help:"Path to OCI registry credentials file." yaml:"file"`
-	Username string `type:"string" env:"OCI_USERNAME" help:"OCI registry username." yaml:"username"`
-	Password string `type:"string" env:"OCI_PASSWORD" help:"OCI registry password." json:"-" yaml:"password"`
-	Registry string `type:"string" default:"ghcr.io" env:"OCI_REGISTRY" help:"OCI registry URL." yaml:"registry"`
+	File      string `type:"existingfile" help:"Path to OCI registry credentials file." yaml:"file"`
+	Namespace string `env:"ARGOCD_NAMESPACE" help:"Kubernetes namespace for ArgoCD secrets." yaml:"namespace"`
+	Password  string `type:"string" env:"OCI_PASSWORD" help:"OCI registry password." json:"-" yaml:"password"`
+	Registry  string `type:"string" default:"ghcr.io" env:"OCI_REGISTRY" help:"OCI registry URL." yaml:"registry"`
+	Secret    bool   `help:"Read repository credentials from ArgoCD Kubernetes secrets." yaml:"secret"`
+	Username  string `type:"string" env:"OCI_USERNAME" help:"OCI registry username." yaml:"username"`
 }
 
 // Data holds all the possible values feeding the application.
@@ -35,9 +37,9 @@ type Settings struct {
 	Credentials          Credentials `embed:"" prefix:"credentials." help:"OCI registry credentials."`
 	DelimLeft            string      `short:"L" default:"{{" help:"Template left delimiter."`
 	DelimRight           string      `short:"R" default:"}}" help:"Template right delimiter."`
-	IgnoreMissing        bool        `short:"i" help:"Ignore missing values files."`
 	IgnoreEmpty          bool        `short:"I" help:"Ignore empty/null values."`
 	IgnoreMainValues     bool        `short:"m" help:"When present, ignore the implicit load of main values.yaml file."`
+	IgnoreMissing        bool        `short:"i" help:"Ignore missing values files."`
 	Logging              Logging     `embed:"" prefix:"logging." help:"Logging configuration."`
 	Out                  string      `short:"o" default:"" help:"Output file (default: stdout)."`
 	Path                 string      `short:"p" default:"." type:"existingdir" help:"Relative path to the chart."`

@@ -74,12 +74,25 @@ func (h *Client) resolveHTTPVersion(ctx context.Context, dep *chart.Dependency) 
 		Debug:           h.Debug,
 		RepositoryCache: getCacheDir(),
 	}
+	entry := &repo.Entry{
+		Name: dep.Name,
+		URL:  dep.Repository,
+	}
+
+	repoCred := h.credForURL(dep.Repository)
+
+	if repoCred.Username != "" {
+		entry.Username = repoCred.Username
+		entry.Password = repoCred.Password
+		entry.CertFile = repoCred.certFile
+		entry.KeyFile = repoCred.keyFile
+
+		defer repoCred.cleanup()
+	}
+
 	// Load the repository index
 	chartRepo, err := repo.NewChartRepository(
-		&repo.Entry{
-			Name: dep.Name,
-			URL:  dep.Repository,
-		},
+		entry,
 		getter.All(&settings),
 	)
 	if err != nil {

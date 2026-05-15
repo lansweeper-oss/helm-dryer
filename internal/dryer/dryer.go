@@ -15,6 +15,7 @@ import (
 	"github.com/lansweeper-oss/helm-dryer/internal/cli"
 	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
 	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
+	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/lansweeper-oss/helm-dryer/internal/values"
 	"go.yaml.in/yaml/v3"
@@ -22,6 +23,7 @@ import (
 
 type Input struct {
 	AppSettings cli.AppSettings
+	CredsStore  *repocreds.Store
 	Data        cli.Data
 	Settings    cli.Settings
 }
@@ -88,6 +90,7 @@ func (in *Input) TemplateValues(ctx context.Context) error {
 	if !errors.Is(err, os.ErrNotExist) {
 		helmClient := client.Client{
 			Credentials:        &in.Settings.Credentials,
+			CredsStore:         in.CredsStore,
 			Debug:              in.Settings.Logging.Debug,
 			Path:               in.Settings.Path,
 			TTL:                utils.GetTTL(in.Settings.TTL),

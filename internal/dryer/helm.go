@@ -47,6 +47,7 @@ func (in *Input) RenderChart(ctx context.Context) error {
 func (in *Input) TemplateChart(ctx context.Context) error {
 	helmClient := client.Client{
 		Credentials:        &in.Settings.Credentials,
+		CredsStore:         in.CredsStore,
 		Debug:              in.Settings.Logging.Debug,
 		Path:               in.Settings.Path,
 		TTL:                utils.GetTTL(in.Settings.TTL),

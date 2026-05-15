@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	ReadOnly     = 0o440
-	ReadWrite    = 0o644
-	ReadWriteDir = 0o750
+	ReadOnly       = 0o440
+	ReadWrite      = 0o644
+	PEMPermissions = 0o600
+	ReadWriteDir   = 0o750
 )
 
 // templateFuncs is the cached Sprig function map with env/expandenv removed.
