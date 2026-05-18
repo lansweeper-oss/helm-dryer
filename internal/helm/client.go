@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/cli"
+	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/lansweeper-oss/helm-dryer/internal/values"
 	"helm.sh/helm/v3/pkg/chart"
@@ -32,11 +32,14 @@ const (
 // Client is a client for interacting with Helm charts.
 type Client struct {
 	Chart              *chart.Chart
-	Credentials        *cli.Credentials
+	CredentialsFile    string
+	CredsStore         *repocreds.Store
 	Debug              bool
 	Path               string
 	TTL                time.Time
 	UpdateDependencies bool
+
+	cachedRegistryClient *ociRegistry.Client
 }
 
 type Options struct {
@@ -234,7 +237,7 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 func (h *Client) UpdateDeps(ctx context.Context, dependencies []*chart.Dependency) error {
 	chartsDir := filepath.Join(h.Path, ChartsFolder)
 
-	downloader, err := h.chartDownloader()
+	downloader, err := h.chartDownloader(nil)
 	if err != nil {
 		return fmt.Errorf("failed to create chart downloader: %w", err)
 	}
@@ -259,22 +262,7 @@ func (h *Client) UpdateDeps(ctx context.Context, dependencies []*chart.Dependenc
 			err = downloadAndStandardize(ctx, downloader, ref, dep, chartsDir)
 
 		default:
-			var chartURL string
-
-			chartURL, err = repo.FindChartInRepoURL(
-				dep.Repository, dep.Name, dep.Version,
-				"", "", "",
-				getter.All(&settings),
-			)
-			if err != nil {
-				err = fmt.Errorf("failed to resolve chart URL for %s: %w", dep.Name, err)
-
-				break
-			}
-
-			slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
-
-			err = downloadAndStandardize(ctx, downloader, chartURL, dep, chartsDir)
+			err = h.downloadHTTPDependency(ctx, dep, chartsDir, &settings)
 		}
 
 		if err != nil {
@@ -334,13 +322,52 @@ func StandardizeArchivePath(downloadedPath, name, version string) error {
 	return nil
 }
 
+// downloadHTTPDependency resolves credentials, finds the chart URL, and downloads an HTTP dependency.
+func (h *Client) downloadHTTPDependency(
+	ctx context.Context, dep *chart.Dependency, chartsDir string, settings *helmCli.EnvSettings,
+) error {
+	repoCred := h.credForURL(dep.Repository)
+	defer repoCred.cleanup()
+
+	chartURL, err := repo.FindChartInRepoURL(
+		dep.Repository, dep.Name, dep.Version,
+		repoCred.certFile, repoCred.keyFile, "",
+		getter.All(settings),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to resolve chart URL for %s: %w", dep.Name, err)
+	}
+
+	slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
+
+	httpDownloader, err := h.chartDownloader(repoCred)
+	if err != nil {
+		return fmt.Errorf("failed to create authenticated downloader for %s: %w", dep.Name, err)
+	}
+
+	return downloadAndStandardize(ctx, httpDownloader, chartURL, dep, chartsDir)
+}
+
 // chartDownloader sets up the proper credentials and cache settings.
-func (h *Client) chartDownloader() (*downloader.ChartDownloader, error) {
+// When rc is set, HTTP basic auth and TLS options are added to the downloader.
+func (h *Client) chartDownloader(repoCred *resolvedCred) (*downloader.ChartDownloader, error) {
 	settings := h.envSettings()
 
 	registryClient, err := h.registryClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create registry client: %w", err)
+	}
+
+	var opts []getter.Option
+
+	if repoCred != nil {
+		if repoCred.Username != "" && repoCred.Password != "" {
+			opts = append(opts, getter.WithBasicAuth(repoCred.Username, repoCred.Password))
+		}
+
+		if repoCred.certFile != "" && repoCred.keyFile != "" {
+			opts = append(opts, getter.WithTLSClientConfig(repoCred.certFile, repoCred.keyFile, ""))
+		}
 	}
 
 	return &downloader.ChartDownloader{
@@ -349,7 +376,70 @@ func (h *Client) chartDownloader() (*downloader.ChartDownloader, error) {
 		RepositoryCache: settings.RepositoryCache,
 		RegistryClient:  registryClient,
 		Getters:         getter.All(&settings),
+		Options:         opts,
 	}, nil
+}
+
+type resolvedCred struct {
+	Username string
+	Password string
+	certFile string
+	keyFile  string
+	cleanups []string
+}
+
+// cleanup removes any temporary PEM files created for TLS credentials.
+func (rc *resolvedCred) cleanup() {
+	for _, path := range rc.cleanups {
+		_ = os.Remove(path)
+	}
+}
+
+// credForURL resolves credentials for a repository URL from the ArgoCD credential store.
+// Returns an empty resolvedCred (not nil) when no match, so callers skip nil checks.
+func (h *Client) credForURL(repoURL string) *resolvedCred {
+	resolved := &resolvedCred{}
+
+	if h.CredsStore == nil {
+		return resolved
+	}
+
+	cred := h.CredsStore.ForURL(repoURL)
+	if cred == nil {
+		return resolved
+	}
+
+	resolved.Username = cred.Username
+	resolved.Password = cred.Password
+
+	if len(cred.TLSCert) > 0 && len(cred.TLSKey) > 0 {
+		resolved.certFile = writeTempPEM(cred.TLSCert)
+		resolved.keyFile = writeTempPEM(cred.TLSKey)
+		resolved.cleanups = append(resolved.cleanups, resolved.certFile, resolved.keyFile)
+	}
+
+	return resolved
+}
+
+// writeTempPEM writes PEM data to a temporary file and returns its path.
+func writeTempPEM(data []byte) string {
+	tempFile, err := os.CreateTemp("", "helm-dryer-*.pem")
+	if err != nil {
+		slog.Warn("Failed to create temp PEM file", "err", err)
+
+		return ""
+	}
+
+	defer func() { _ = tempFile.Close() }()
+
+	_, err = tempFile.Write(data)
+	if err != nil {
+		slog.Warn("Failed to write temp PEM file", "err", err)
+
+		return ""
+	}
+
+	return tempFile.Name()
 }
 
 // dependencyKey returns a unique key for deduplication.
@@ -410,25 +500,22 @@ func (h *Client) packageLocalDependency(dep *chart.Dependency, destDir string) e
 	return nil
 }
 
-// registryClient creates and authenticates an OCI registry client using the configured credentials.
+// registryClient creates and authenticates an OCI registry client.
+// Static credentials (via CredsStore exact match) take precedence over ArgoCD templates (prefix match).
 func (h *Client) registryClient() (*ociRegistry.Client, error) {
+	if h.cachedRegistryClient != nil {
+		return h.cachedRegistryClient, nil
+	}
+
 	clientOpts := []ociRegistry.ClientOption{
 		ociRegistry.ClientOptDebug(h.Debug),
 		ociRegistry.ClientOptEnableCache(true),
 	}
 
-	var opt ociRegistry.LoginOption
+	if h.CredentialsFile != "" {
+		slog.Debug("Using credentials file for OCI registry")
 
-	if h.Credentials != nil {
-		if h.Credentials.Username != "" && h.Credentials.Password != "" && h.Credentials.Registry != "" {
-			slog.Debug("Using basic auth for OCI registry in " + h.Credentials.Registry)
-
-			opt = ociRegistry.LoginOptBasicAuth(h.Credentials.Username, h.Credentials.Password)
-		} else if h.Credentials.File != "" {
-			slog.Debug("Using credentials file for OCI registry")
-
-			clientOpts = append(clientOpts, ociRegistry.ClientOptCredentialsFile(h.Credentials.File))
-		}
+		clientOpts = append(clientOpts, ociRegistry.ClientOptCredentialsFile(h.CredentialsFile))
 	}
 
 	registryClient, err := ociRegistry.NewClient(clientOpts...)
@@ -436,12 +523,51 @@ func (h *Client) registryClient() (*ociRegistry.Client, error) {
 		return nil, fmt.Errorf("failed to create OCI registry client: %w", err)
 	}
 
-	if opt != nil {
-		err = registryClient.Login(h.Credentials.Registry, opt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to login to OCI registry: %w", err)
-		}
+	if h.CredsStore != nil && h.Chart != nil {
+		h.loginOCIRegistries(registryClient)
 	}
 
+	h.cachedRegistryClient = registryClient
+
 	return registryClient, nil
+}
+
+// loginOCIRegistries authenticates to all OCI registries referenced by chart dependencies.
+func (h *Client) loginOCIRegistries(registryClient *ociRegistry.Client) {
+	seen := make(map[string]struct{})
+
+	for _, dep := range h.Chart.Metadata.Dependencies {
+		if !ociRegistry.IsOCI(dep.Repository) {
+			continue
+		}
+
+		host := extractOCIHost(dep.Repository)
+		if _, ok := seen[host]; ok {
+			continue
+		}
+
+		seen[host] = struct{}{}
+
+		cred := h.CredsStore.ForURL(dep.Repository)
+		if cred == nil || cred.Username == "" {
+			continue
+		}
+
+		slog.Debug("Logging in to OCI registry", "host", host)
+
+		loginErr := registryClient.Login(host,
+			ociRegistry.LoginOptBasicAuth(cred.Username, cred.Password))
+		if loginErr != nil {
+			slog.Warn("Failed to login to OCI registry", "host", host, "err", loginErr)
+		}
+	}
+}
+
+// extractOCIHost returns the host (and port) from an oci:// URL.
+func extractOCIHost(repoURL string) string {
+	trimmed := strings.TrimPrefix(repoURL, "oci://")
+
+	host, _, _ := strings.Cut(trimmed, "/")
+
+	return host
 }

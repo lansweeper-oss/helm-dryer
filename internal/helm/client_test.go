@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lansweeper-oss/helm-dryer/internal/cli"
 	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
 	utils "github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/stretchr/testify/assert"
@@ -263,9 +262,8 @@ dependencies:
 
 	// Test case: UpdateDeps with a valid chart path
 	helmClient := client.Client{
-		Credentials: &cli.Credentials{},
-		Debug:       true,
-		Path:        tempDir,
+		Debug: true,
+		Path:  tempDir,
 	}
 	_, err = helmClient.ReadChartDependencies(context.Background())
 	require.NoError(t, err, "ReadChartDependencies should not return an error")

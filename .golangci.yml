@@ -18,6 +18,7 @@ linters:
     - goconst
     - gocritic
     - gocyclo
+    - gomodguard_v2
     - govet
     - misspell
     - nakedret
@@ -30,6 +31,7 @@ linters:
     - cyclop # redudant with gocyclo
     - depguard
     - exhaustruct
+    - gomodguard
     - tagalign
     - wsl
   settings:
@@ -56,7 +58,7 @@ linters:
       min-occurrences: 5
       # ignore using literal string "true" during tests
       ignore-string-values:
-        - 'true'
+        - "true"
 
     lll:
       # tab width in spaces. Default to 1.
@@ -100,6 +102,7 @@ linters:
           - forcetypeassert
           - funlen
           - gochecknoglobals
+          - goconst
           - gocyclo
           - gosec
           - scopelint
