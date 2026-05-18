@@ -10,7 +10,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/lansweeper-oss/helm-dryer/internal/cli"
 	"github.com/lansweeper-oss/helm-dryer/internal/dryer"
-	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
+	repoCredentials "github.com/lansweeper-oss/helm-dryer/internal/repocreds"
 )
 
 //nolint:gochecknoglobals
@@ -88,24 +88,24 @@ func (c *CLI) newInput(ctx context.Context) dryer.Input {
 }
 
 // buildCredsStore merges CLI credentials and optional Kubernetes secrets into a credential store.
-func buildCredsStore(ctx context.Context, creds *cli.Credentials) *repocreds.Store {
-	var repos, templates []repocreds.RepoCred
+func buildCredsStore(ctx context.Context, credentials *cli.Credentials) *repoCredentials.Store {
+	var repos, templates []repoCredentials.RepoCred
 
-	if creds.Username != "" && creds.Password != "" && creds.Registry != "" {
-		repos = append(repos, repocreds.RepoCred{
-			URL:      "oci://" + creds.Registry,
-			Username: creds.Username,
-			Password: creds.Password,
+	if credentials.Username != "" && credentials.Password != "" && credentials.Registry != "" {
+		repos = append(repos, repoCredentials.RepoCred{
+			URL:      "oci://" + credentials.Registry,
+			Username: credentials.Username,
+			Password: credentials.Password,
 		})
 	}
 
-	if creds.Secret {
-		k8sRepos, k8sTmpls, err := repocreds.FetchFromCluster(ctx, creds.Namespace)
+	if credentials.Secret {
+		k8sRepoCreds, k8sTplCreds, err := repoCredentials.FetchFromCluster(ctx, credentials.Namespace)
 		if err != nil {
 			slog.Warn("Failed to fetch ArgoCD credentials, continuing without them", "err", err)
 		} else {
-			repos = append(repos, k8sRepos...)
-			templates = append(templates, k8sTmpls...)
+			repos = append(repos, k8sRepoCreds...)
+			templates = append(templates, k8sTplCreds...)
 		}
 	}
 
@@ -113,7 +113,7 @@ func buildCredsStore(ctx context.Context, creds *cli.Credentials) *repocreds.Sto
 		return nil
 	}
 
-	return repocreds.NewStore(repos, templates)
+	return repoCredentials.NewStore(repos, templates)
 }
 
 // initLogger configures the default slog logger with the given debug level and output format.
