@@ -36,7 +36,7 @@ trap 'rm -f "$TEMP_FILE"' EXIT
 # Process the template file line by line
 while IFS= read -r line; do
     # Substitute environment variables
-    line=$(echo "$line" | envsubst)
+    line=$(echo "$line" | envsubst '$COVERAGE $COVERAGE_COLOR')
 
     # Check if line contains EXEC comment
     if echo "$line" | grep -q "<!-- CMD:"; then
