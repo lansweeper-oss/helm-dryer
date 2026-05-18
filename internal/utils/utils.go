@@ -113,7 +113,7 @@ func innerDeepCopy(value any) (any, error) {
 		for idx, elem := range val {
 			c, err := innerDeepCopy(elem)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("copying element at index %d: %w", idx, err)
 			}
 
 			copied[idx] = c
