@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](coverage.svg) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer [![Coverage](https://img.shields.io/badge/coverage-72.6%-orange)](coverage.svg) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -70,11 +70,11 @@ While this would be possible instead, given we inject the values referenced belo
 arguments (similarly to `helm --set` key-value pairs):
 
 ```yaml
-{{- $storageName := "s3" }} # we can also define variables :-)
+{{-  := "s3" }} # we can also define variables :-)
 configuration:
   clusterName: {{ .Values.clusterName }}
   storage:
-  - name: {{ $storageName }}
+  - name: {{  }}
     bucket: {{ printf "%s-%s-%s" .Values.region .Values.domain .Values.accountId }}
     config:
       kmsKeyId: {{ printf "alias/%s-%s-%s" .Values.region .Values.domain .Values.key }}
@@ -190,18 +190,23 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
+      --credentials.namespace=STRING
+                                   Kubernetes namespace for ArgoCD secrets
+                                   ($ARGOCD_NAMESPACE).
       --credentials.password=STRING
                                    OCI registry password ($OCI_PASSWORD).
       --credentials.registry="ghcr.io"
                                    OCI registry URL ($OCI_REGISTRY).
+      --credentials.secret         Read repository credentials from ArgoCD
+                                   Kubernetes secrets.
+      --credentials.username=STRING
+                                   OCI registry username ($OCI_USERNAME).
   -L, --delim-left="{{"            Template left delimiter.
   -R, --delim-right="}}"           Template right delimiter.
-  -i, --ignore-missing             Ignore missing values files.
   -I, --ignore-empty               Ignore empty/null values.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
+  -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
@@ -257,18 +262,23 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
+      --credentials.namespace=STRING
+                                   Kubernetes namespace for ArgoCD secrets
+                                   ($ARGOCD_NAMESPACE).
       --credentials.password=STRING
                                    OCI registry password ($OCI_PASSWORD).
       --credentials.registry="ghcr.io"
                                    OCI registry URL ($OCI_REGISTRY).
+      --credentials.secret         Read repository credentials from ArgoCD
+                                   Kubernetes secrets.
+      --credentials.username=STRING
+                                   OCI registry username ($OCI_USERNAME).
   -L, --delim-left="{{"            Template left delimiter.
   -R, --delim-right="}}"           Template right delimiter.
-  -i, --ignore-missing             Ignore missing values files.
   -I, --ignore-empty               Ignore empty/null values.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
+  -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
@@ -321,18 +331,23 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
+      --credentials.namespace=STRING
+                                   Kubernetes namespace for ArgoCD secrets
+                                   ($ARGOCD_NAMESPACE).
       --credentials.password=STRING
                                    OCI registry password ($OCI_PASSWORD).
       --credentials.registry="ghcr.io"
                                    OCI registry URL ($OCI_REGISTRY).
+      --credentials.secret         Read repository credentials from ArgoCD
+                                   Kubernetes secrets.
+      --credentials.username=STRING
+                                   OCI registry username ($OCI_USERNAME).
   -L, --delim-left="{{"            Template left delimiter.
   -R, --delim-right="}}"           Template right delimiter.
-  -i, --ignore-missing             Ignore missing values files.
   -I, --ignore-empty               Ignore empty/null values.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
+  -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
@@ -381,18 +396,23 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
+      --credentials.namespace=STRING
+                                   Kubernetes namespace for ArgoCD secrets
+                                   ($ARGOCD_NAMESPACE).
       --credentials.password=STRING
                                    OCI registry password ($OCI_PASSWORD).
       --credentials.registry="ghcr.io"
                                    OCI registry URL ($OCI_REGISTRY).
+      --credentials.secret         Read repository credentials from ArgoCD
+                                   Kubernetes secrets.
+      --credentials.username=STRING
+                                   OCI registry username ($OCI_USERNAME).
   -L, --delim-left="{{"            Template left delimiter.
   -R, --delim-right="}}"           Template right delimiter.
-  -i, --ignore-missing             Ignore missing values files.
   -I, --ignore-empty               Ignore empty/null values.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
+  -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
@@ -476,18 +496,23 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
+      --credentials.namespace=STRING
+                                   Kubernetes namespace for ArgoCD secrets
+                                   ($ARGOCD_NAMESPACE).
       --credentials.password=STRING
                                    OCI registry password ($OCI_PASSWORD).
       --credentials.registry="ghcr.io"
                                    OCI registry URL ($OCI_REGISTRY).
+      --credentials.secret         Read repository credentials from ArgoCD
+                                   Kubernetes secrets.
+      --credentials.username=STRING
+                                   OCI registry username ($OCI_USERNAME).
   -L, --delim-left="{{"            Template left delimiter.
   -R, --delim-right="}}"           Template right delimiter.
-  -i, --ignore-missing             Ignore missing values files.
   -I, --ignore-empty               Ignore empty/null values.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
+  -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
