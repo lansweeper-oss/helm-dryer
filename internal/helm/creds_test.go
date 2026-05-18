@@ -1,6 +1,7 @@
 package client //nolint:testpackage // tests unexported helpers
 
 import (
+	"os"
 	"testing"
 
 	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
@@ -88,5 +89,39 @@ func TestCredForURL(t *testing.T) {
 		// Files should be removed after cleanup
 		assert.NoFileExists(t, resolved.certFile)
 		assert.NoFileExists(t, resolved.keyFile)
+	})
+}
+
+func TestWriteTempPEM(t *testing.T) {
+	t.Parallel()
+
+	t.Run("writes data and returns valid path", func(t *testing.T) {
+		t.Parallel()
+
+		path := writeTempPEM([]byte("test-pem-data"))
+		require.NotEmpty(t, path)
+
+		defer os.Remove(path)
+
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, []byte("test-pem-data"), content)
+
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	})
+
+	t.Run("empty data writes empty file", func(t *testing.T) {
+		t.Parallel()
+
+		path := writeTempPEM([]byte{})
+		require.NotEmpty(t, path)
+
+		defer os.Remove(path)
+
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Empty(t, content)
 	})
 }

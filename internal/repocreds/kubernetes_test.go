@@ -98,6 +98,72 @@ func TestFetchSecrets_EmptyNamespace(t *testing.T) {
 	assert.Nil(t, store.ForURL("https://anything.com"))
 }
 
+func TestNormalizeURL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"lowercase scheme", "HTTPS://example.com/path", "https://example.com/path"},
+		{"lowercase host", "https://EXAMPLE.COM/path", "https://example.com/path"},
+		{"trim trailing slash", "https://example.com/", "https://example.com"},
+		{"trim multiple trailing slashes", "https://example.com///", "https://example.com"},
+		{"preserve path case", "https://example.com/MyChart", "https://example.com/MyChart"},
+		{"OCI URL", "OCI://GHCR.IO/Org/Chart", "oci://ghcr.io/Org/Chart"},
+		{"already normalized", "https://example.com", "https://example.com"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, normalizeURL(tc.input))
+		})
+	}
+}
+
+func TestParseSecret(t *testing.T) {
+	t.Parallel()
+
+	t.Run("all fields present", func(t *testing.T) {
+		t.Parallel()
+
+		data := map[string][]byte{
+			"url":               []byte("https://example.com"),
+			"username":          []byte("user"),
+			"password":          []byte("pass"),
+			"tlsClientCertData": []byte("cert"),
+			"tlsClientCertKey":  []byte("key"),
+		}
+
+		cred := parseSecret(data)
+		assert.Equal(t, "https://example.com", cred.URL)
+		assert.Equal(t, "user", cred.Username)
+		assert.Equal(t, "pass", cred.Password)
+		assert.Equal(t, []byte("cert"), cred.TLSCert)
+		assert.Equal(t, []byte("key"), cred.TLSKey)
+	})
+
+	t.Run("missing fields return zero values", func(t *testing.T) {
+		t.Parallel()
+
+		cred := parseSecret(map[string][]byte{"url": []byte("https://example.com")})
+		assert.Equal(t, "https://example.com", cred.URL)
+		assert.Empty(t, cred.Username)
+		assert.Empty(t, cred.Password)
+		assert.Nil(t, cred.TLSCert)
+		assert.Nil(t, cred.TLSKey)
+	})
+
+	t.Run("nil data returns empty cred", func(t *testing.T) {
+		t.Parallel()
+
+		cred := parseSecret(nil)
+		assert.Empty(t, cred.URL)
+	})
+}
+
 func TestFetchSecrets_TLSCertData(t *testing.T) {
 	t.Parallel()
 
