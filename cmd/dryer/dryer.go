@@ -10,6 +10,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/lansweeper-oss/helm-dryer/internal/cli"
 	"github.com/lansweeper-oss/helm-dryer/internal/dryer"
+	repoCredentials "github.com/lansweeper-oss/helm-dryer/internal/repocreds"
 )
 
 //nolint:gochecknoglobals
@@ -40,77 +41,82 @@ func (c *CLI) Run(ctx *kong.Context) error {
 		return fmt.Errorf("bad timeout: %w", err)
 	}
 
-	// Create a context with configurable timeout for all network operations (downloads, rendering).
-	// This ensures that network calls and long operations don't hang indefinitely,
-	// especially important for ArgoCD CMP plugin execution which has its own timeouts.
 	requestCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	input := c.newInput(requestCtx)
+
+	var runErr error
 
 	switch ctx.Command() {
 	case "get":
 		slog.Debug("Rendering values")
 
-		dryer := dryer.Input{
-			Data:     c.Data,
-			Settings: c.Settings,
-		}
-
-		err := dryer.TemplateValues(requestCtx)
-		if err != nil {
-			return fmt.Errorf("failed to render values: %w", err)
-		}
-
-		return nil
+		runErr = input.TemplateValues(requestCtx)
 	case "render-app":
 		slog.Debug("Rendering chart with Dryer from an ArgoCD Application file")
 
-		dryer := dryer.Input{
-			AppSettings: c.RenderApp,
-			Data:        c.Data,
-			Settings:    c.Settings,
-		}
-
-		err := dryer.RenderFromApp(requestCtx)
-		if err != nil {
-			return fmt.Errorf("failed to render from app: %w", err)
-		}
-
-		return nil
+		input.AppSettings = c.RenderApp
+		runErr = input.RenderFromApp(requestCtx)
 	case "template":
 		slog.Debug("Rendering chart with Dryer")
 
-		dryer := dryer.Input{
-			AppSettings: c.Template,
-			Data:        c.Data,
-			Settings:    c.Settings,
-		}
-
-		err := dryer.TemplateChart(requestCtx)
-		if err != nil {
-			return fmt.Errorf("failed to template chart: %w", err)
-		}
-
-		return nil
+		input.AppSettings = c.Template
+		runErr = input.TemplateChart(requestCtx)
 	case "render":
-		dryer := dryer.Input{
-			Data:     c.Data,
-			Settings: c.Settings,
-		}
-
-		err := dryer.RenderChart(requestCtx)
-		if err != nil {
-			return fmt.Errorf("failed to render chart: %w", err)
-		}
-
-		return nil
-	default: // show version
-		// version is taken from environment variable in build time
+		runErr = input.RenderChart(requestCtx)
+	default:
 		slog.Info("Helm-dryer version", "version", BuildVersion, "build_time", BuildTime)
 
 		return nil
 	}
+
+	if runErr != nil {
+		return fmt.Errorf("%s: %w", ctx.Command(), runErr)
+	}
+
+	return nil
 }
 
+// newInput builds a dryer.Input from CLI flags, including any resolved credentials.
+func (c *CLI) newInput(ctx context.Context) dryer.Input {
+	return dryer.Input{
+		CredsStore: buildCredsStore(ctx, &c.Credentials),
+		Data:       c.Data,
+		Settings:   c.Settings,
+	}
+}
+
+// buildCredsStore merges CLI credentials and optional Kubernetes secrets into a credential store.
+func buildCredsStore(ctx context.Context, credentials *cli.Credentials) *repoCredentials.Store {
+	var repos, templates []repoCredentials.RepoCred
+
+	if credentials.Username != "" && credentials.Password != "" && credentials.Registry != "" {
+		repos = append(repos, repoCredentials.RepoCred{
+			URL:      "oci://" + credentials.Registry,
+			Username: credentials.Username,
+			Password: credentials.Password,
+		})
+	}
+
+	if credentials.Secret {
+		k8sRepoCreds, k8sTplCreds, err := repoCredentials.FetchFromCluster(ctx, credentials.Namespace)
+		if err != nil {
+			slog.Warn("Failed to fetch ArgoCD credentials, continuing without them", "err", err)
+		} else {
+			repos = append(repos, k8sRepoCreds...)
+			templates = append(templates, k8sTplCreds...)
+		}
+	}
+
+	if len(repos) == 0 && len(templates) == 0 {
+		return nil
+	}
+
+	return repoCredentials.NewStore(repos, templates)
+}
+
+// initLogger configures the default slog logger with the given debug level and output format.
 func initLogger(debug bool, format string) {
 	var level slog.Level
 	if debug {
