@@ -17,21 +17,33 @@ type RepoCred struct {
 
 // Store matches repository URLs to credentials.
 // Repository secrets use exact URL matching; repo-creds templates use longest-prefix matching.
+// URLs are normalized at construction to avoid repeated parsing during lookups.
 type Store struct {
 	repos     []RepoCred
 	templates []RepoCred
+	normRepos []string
+	normTmpls []string
 }
 
 // NewStore creates a Store from repository secrets (exact match) and repo-creds templates (prefix match).
 func NewStore(repos, templates []RepoCred) *Store {
-	return &Store{repos: repos, templates: templates}
+	normRepos := make([]string, len(repos))
+	for i := range repos {
+		normRepos[i] = normalizeURL(repos[i].URL)
+	}
+
+	normTmpls := make([]string, len(templates))
+	for i := range templates {
+		normTmpls[i] = normalizeURL(templates[i].URL)
+	}
+
+	return &Store{
+		repos:     repos,
+		templates: templates,
+		normRepos: normRepos,
+		normTmpls: normTmpls,
+	}
 }
-
-// Repos returns the repository credentials (exact match entries).
-func (s *Store) Repos() []RepoCred { return s.repos }
-
-// Templates returns the repo-creds template credentials (prefix match entries).
-func (s *Store) Templates() []RepoCred { return s.templates }
 
 // ForURL returns the best credential match for the given repository URL.
 // Repository secrets (exact match) take precedence over repo-creds templates (longest prefix).
@@ -43,18 +55,17 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 
 	norm := normalizeURL(repoURL)
 
-	for i := range s.repos {
-		if normalizeURL(s.repos[i].URL) == norm {
+	for i, n := range s.normRepos {
+		if n == norm {
 			return &s.repos[i]
 		}
 	}
 
 	best, bestLen := -1, 0
 
-	for i := range s.templates {
-		credURL := normalizeURL(s.templates[i].URL)
-		if strings.HasPrefix(norm, credURL) && len(credURL) > bestLen {
-			best, bestLen = i, len(credURL)
+	for i, n := range s.normTmpls {
+		if strings.HasPrefix(norm, n) && len(n) > bestLen {
+			best, bestLen = i, len(n)
 		}
 	}
 
@@ -65,6 +76,9 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 	return nil
 }
 
+// normalizeURL canonicalizes a URL for comparison: trims trailing slashes, lowercases scheme and
+// host. Path remains case-sensitive. This handles inconsistencies in how ArgoCD secrets store URLs
+// (e.g. "https://example.com/Charts" vs "https://example.com/charts").
 func normalizeURL(raw string) string {
 	raw = strings.TrimRight(raw, "/")
 

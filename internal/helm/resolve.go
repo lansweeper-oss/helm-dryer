@@ -69,6 +69,7 @@ func (h *Client) ResolveVersion(ctx context.Context, dependency *chart.Dependenc
 	return h.resolveHTTPVersion(ctx, dependency)
 }
 
+// resolveHTTPVersion downloads the repository index and finds the best matching version.
 func (h *Client) resolveHTTPVersion(ctx context.Context, dep *chart.Dependency) (string, error) {
 	settings := helmCli.EnvSettings{
 		Debug:           h.Debug,

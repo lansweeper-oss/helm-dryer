@@ -78,6 +78,7 @@ func (c *CLI) Run(ctx *kong.Context) error {
 	return nil
 }
 
+// newInput builds a dryer.Input from CLI flags, including any resolved credentials.
 func (c *CLI) newInput(ctx context.Context) dryer.Input {
 	return dryer.Input{
 		CredsStore: buildCredsStore(ctx, &c.Credentials),
@@ -86,6 +87,7 @@ func (c *CLI) newInput(ctx context.Context) dryer.Input {
 	}
 }
 
+// buildCredsStore merges CLI credentials and optional Kubernetes secrets into a credential store.
 func buildCredsStore(ctx context.Context, creds *cli.Credentials) *repocreds.Store {
 	var repos, templates []repocreds.RepoCred
 
@@ -98,12 +100,12 @@ func buildCredsStore(ctx context.Context, creds *cli.Credentials) *repocreds.Sto
 	}
 
 	if creds.Secret {
-		store, err := repocreds.FetchFromCluster(ctx, creds.Namespace)
+		k8sRepos, k8sTmpls, err := repocreds.FetchFromCluster(ctx, creds.Namespace)
 		if err != nil {
 			slog.Warn("Failed to fetch ArgoCD credentials, continuing without them", "err", err)
-		} else if store != nil {
-			repos = append(repos, store.Repos()...)
-			templates = append(templates, store.Templates()...)
+		} else {
+			repos = append(repos, k8sRepos...)
+			templates = append(templates, k8sTmpls...)
 		}
 	}
 
@@ -114,6 +116,7 @@ func buildCredsStore(ctx context.Context, creds *cli.Credentials) *repocreds.Sto
 	return repocreds.NewStore(repos, templates)
 }
 
+// initLogger configures the default slog logger with the given debug level and output format.
 func initLogger(debug bool, format string) {
 	var level slog.Level
 	if debug {

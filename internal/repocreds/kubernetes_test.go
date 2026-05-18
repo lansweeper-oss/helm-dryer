@@ -62,12 +62,12 @@ func TestFetchSecrets(t *testing.T) {
 		},
 	}
 
-	//nolint:staticcheck // NewClientset requires applyconfig generation
 	clientset := fake.NewSimpleClientset(repoSecret, credsSecret, secretMissingURL, unrelatedSecret)
 
-	store, err := fetchSecrets(context.Background(), clientset, "argocd")
+	repos, templates, err := fetchSecrets(context.Background(), clientset, "argocd")
 	require.NoError(t, err)
-	require.NotNil(t, store)
+
+	store := NewStore(repos, templates)
 
 	// Repository secret: exact match
 	cred := store.ForURL("https://charts.example.com")
@@ -89,12 +89,12 @@ func TestFetchSecrets(t *testing.T) {
 func TestFetchSecrets_EmptyNamespace(t *testing.T) {
 	t.Parallel()
 
-	//nolint:staticcheck // NewClientset requires applyconfig generation
 	clientset := fake.NewSimpleClientset()
 
-	store, err := fetchSecrets(context.Background(), clientset, "argocd")
+	repos, templates, err := fetchSecrets(context.Background(), clientset, "argocd")
 	require.NoError(t, err)
-	require.NotNil(t, store)
+
+	store := NewStore(repos, templates)
 	assert.Nil(t, store.ForURL("https://anything.com"))
 }
 
@@ -114,13 +114,13 @@ func TestFetchSecrets_TLSCertData(t *testing.T) {
 		},
 	}
 
-	//nolint:staticcheck // NewClientset requires applyconfig generation
 	clientset := fake.NewSimpleClientset(secret)
 
-	store, err := fetchSecrets(context.Background(), clientset, "argocd")
+	repos, _, err := fetchSecrets(context.Background(), clientset, "argocd")
 	require.NoError(t, err)
+	require.Len(t, repos, 1)
 
-	cred := store.ForURL("https://secure.example.com")
+	cred := &repos[0]
 	require.NotNil(t, cred)
 	assert.Equal(t, []byte("cert-pem-data"), cred.TLSCert)
 	assert.Equal(t, []byte("key-pem-data"), cred.TLSKey)

@@ -46,7 +46,7 @@ func (in *Input) RenderChart(ctx context.Context) error {
 // then renders the chart using the Helm client.
 func (in *Input) TemplateChart(ctx context.Context) error {
 	helmClient := client.Client{
-		Credentials:        &in.Settings.Credentials,
+		CredentialsFile:    in.Settings.Credentials.File,
 		CredsStore:         in.CredsStore,
 		Debug:              in.Settings.Logging.Debug,
 		Path:               in.Settings.Path,
