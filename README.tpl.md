@@ -1,4 +1,4 @@
-# helm-dryer [![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}-${COVERAGE_COLOR})](coverage.svg) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}-${COVERAGE_COLOR}) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
