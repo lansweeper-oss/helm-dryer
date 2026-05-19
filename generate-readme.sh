@@ -6,7 +6,7 @@ set -e
 
 # Determine coverage color based on percentage
 if [ -n "$COVERAGE" ]; then
-    COVERAGE_INT=${COVERAGE%.*}
+    export COVERAGE_INT=${COVERAGE%.*}
     if (( COVERAGE_INT <= 50 )); then
         COVERAGE_COLOR="red"
     elif (( COVERAGE_INT >= 80 )); then
@@ -36,7 +36,7 @@ trap 'rm -f "$TEMP_FILE"' EXIT
 # Process the template file line by line
 while IFS= read -r line; do
     # Substitute environment variables
-    line=$(echo "$line" | envsubst '$COVERAGE $COVERAGE_COLOR')
+    line=$(echo "$line" | envsubst '$COVERAGE_INT $COVERAGE_COLOR')
 
     # Check if line contains EXEC comment
     if echo "$line" | grep -q "<!-- CMD:"; then
