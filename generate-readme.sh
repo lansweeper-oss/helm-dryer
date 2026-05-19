@@ -4,6 +4,19 @@
 
 set -e
 
+# Determine coverage color based on percentage
+if [ -n "$COVERAGE" ]; then
+    COVERAGE_INT=${COVERAGE%.*}
+    if (( COVERAGE_INT <= 50 )); then
+        COVERAGE_COLOR="red"
+    elif (( COVERAGE_INT >= 80 )); then
+        COVERAGE_COLOR="green"
+    else
+        COVERAGE_COLOR="orange"
+    fi
+    export COVERAGE_COLOR
+fi
+
 HEADER='```shell'
 FOOTER='```'
 TEMPLATE_FILE="README.tpl.md"
@@ -22,6 +35,9 @@ trap 'rm -f "$TEMP_FILE"' EXIT
 
 # Process the template file line by line
 while IFS= read -r line; do
+    # Substitute environment variables
+    line=$(echo "$line" | envsubst '$COVERAGE $COVERAGE_COLOR')
+
     # Check if line contains EXEC comment
     if echo "$line" | grep -q "<!-- CMD:"; then
         # Extract the command from the CMD comment using bash parameter expansion.
