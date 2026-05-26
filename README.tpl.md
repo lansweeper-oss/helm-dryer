@@ -488,6 +488,12 @@ the CMP protocol streams `stdout` as the manifest output and throws away `stderr
 For this reason, even when `--debug` is set nothing is shown in the container logs.
 You'd only see them if an application fails to render, or if you use `Dryer` as a CLI.
 
+## Authentication
+
+See [docs/authentication.md](docs/authentication.md) for a detailed guide on configuring
+credentials for OCI registries and HTTP Helm repositories, including basic auth, TLS client
+certificates, Docker credentials files, and Kubernetes secret integration.
+
 ## ArgoCD integration
 
 As with any other Configuration Management Plugin, `dryer` runs as a sidecar container of
