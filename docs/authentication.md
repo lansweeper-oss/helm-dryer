@@ -128,8 +128,11 @@ graph TD
 
 ## Limitations
 
-- **No cloud-native auth**: ECR, ACR, and GCR token exchange are not built in. Users must
-  pre-authenticate and supply a Docker credentials file.
+- **No cloud-native auth**: Automatic token exchange for ECR, ACR, and GCR is not built in
+  (e.g., `ecr:GetAuthorizationToken`, Azure AD token refresh, GCR OAuth2). Users must
+  authenticate externally and either supply a Docker credentials file (`--credentials.file`) or
+  store static credentials (e.g., ACR service principals, ECR auth tokens) in ArgoCD Kubernetes
+  secrets for basic auth.
 - **No bearer token field**: `RepoCred` has no dedicated token field. Token-based auth is only
   possible through the Docker credentials file.
 - **TLS is K8s-secret-only**: mTLS cannot be configured via CLI flags or environment variables.
