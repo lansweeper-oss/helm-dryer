@@ -70,11 +70,17 @@ by Docker's credential helpers.
 ## Credential Store and URL Matching
 
 When using CLI-based basic auth or Kubernetes secrets, credentials are stored in a `Store` that
-matches repository URLs using two strategies:
+matches repository URLs in three steps (first match wins):
 
-1. **Exact match**: ArgoCD `repository` secrets. The URL must match exactly (after normalization).
-2. **Longest-prefix match**: ArgoCD `repo-creds` secrets. The credential with the longest matching
+1. **Exact match** on `repository` secrets. The URL must match exactly (after normalization).
+2. **Longest-prefix match** on `repo-creds` secrets. The credential with the longest matching
    URL prefix is selected.
+3. **OCI prefix fallback** on `repository` secrets. When the lookup URL starts with `oci://`,
+   OCI repository secrets are matched bidirectionally by prefix — either the secret URL is a
+   prefix of the lookup URL, or vice versa. This mirrors
+   [ArgoCD's behavior](https://github.com/argoproj/argo-cd/issues/14636) for `enableOCI`
+   repositories where the secret stores the registry root (e.g., `ghcr.io/org`) and the chart
+   dependency includes a subpath (e.g., `oci://ghcr.io/org/charts/my-chart`).
 
 URL normalization trims trailing slashes and lowercases the scheme and host (path remains
 case-sensitive).
@@ -95,7 +101,7 @@ argocd.argoproj.io/secret-type in (repository, repo-creds)
 
 | Label value | Match strategy | Purpose |
 |-------------|---------------|---------|
-| `repository` | Exact URL match | Credentials for a specific repository |
+| `repository` | Exact match, then OCI prefix fallback | Credentials for a specific repository |
 | `repo-creds` | Longest-prefix match | Template credentials for a URL prefix |
 
 The namespace is auto-detected from the pod's service account mount unless overridden by

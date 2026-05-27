@@ -153,7 +153,7 @@ func downloadAndStandardize(
 }
 
 func extractOCIHost(repoURL string) string {
-	trimmed := strings.TrimPrefix(repoURL, "oci://")
+	trimmed := strings.TrimPrefix(repoURL, repocreds.OCISchemePrefix)
 
 	host, _, _ := strings.Cut(trimmed, "/")
 
