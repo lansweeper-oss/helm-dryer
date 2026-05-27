@@ -17,10 +17,12 @@ if [ -n "$COVERAGE" ]; then
     export COVERAGE_COLOR
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 HEADER='```shell'
 FOOTER='```'
-TEMPLATE_FILE="README.tpl.md"
-OUTPUT_FILE="README.md"
+TEMPLATE_FILE="${SCRIPT_DIR}/README.tpl.md"
+OUTPUT_FILE="${SCRIPT_DIR}/../README.md"
 
 if [ ! -f "${TEMPLATE_FILE}" ]; then
     echo "Error: ${TEMPLATE_FILE} not found"
