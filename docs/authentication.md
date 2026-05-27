@@ -105,11 +105,12 @@ The namespace is auto-detected from the pod's service account mount unless overr
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `url` | string | Repository URL |
+| `url` | string | Repository URL (raw host when `enableOCI` is set) |
 | `username` | string | Basic auth username |
 | `password` | string | Basic auth password |
 | `tlsClientCertData` | []byte | PEM-encoded client certificate |
 | `tlsClientCertKey` | []byte | PEM-encoded client private key |
+| `enableOCI` | string | When truthy, the URL is treated as an OCI registry and `oci://` is prepended if not already present |
 
 ## Data Flow
 
