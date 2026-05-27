@@ -47,7 +47,13 @@ func NewStore(repos, templates []RepoCred) *Store {
 }
 
 // ForURL returns the best credential match for the given repository URL.
-// Repository secrets (exact match) take precedence over repo-creds templates (longest prefix).
+//
+// Matching order (first match wins):
+//  1. Exact match on repository secrets.
+//  2. Longest-prefix match on repo-creds templates.
+//  3. OCI fallback: bidirectional prefix match on OCI repository secrets,
+//     mirroring ArgoCD's behavior for enableOCI repositories (see https://github.com/argoproj/argo-cd/issues/14636).
+//
 // Returns nil when no match is found.
 func (s *Store) ForURL(repoURL string) *RepoCred {
 	if s == nil {
@@ -56,26 +62,44 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 
 	norm := normalizeURL(repoURL)
 
-	for i, n := range s.normRepos {
-		if n == norm {
-			slog.Debug("Credential matched (exact)", "url", repoURL, "secretURL", s.repos[i].URL)
+	for idx, normURL := range s.normRepos {
+		if normURL == norm {
+			slog.Debug("Credential matched (exact)", "url", repoURL, "secretURL", s.repos[idx].URL)
 
-			return &s.repos[i]
+			return &s.repos[idx]
 		}
 	}
 
-	best, bestLen := -1, 0
+	best, bestLen := (*RepoCred)(nil), 0
 
-	for i, n := range s.normTmpls {
-		if strings.HasPrefix(norm, n) && len(n) > bestLen {
-			best, bestLen = i, len(n)
+	for idx, normURL := range s.normTmpls {
+		if strings.HasPrefix(norm, normURL) && len(normURL) > bestLen {
+			best, bestLen = &s.templates[idx], len(normURL)
 		}
 	}
 
-	if best >= 0 {
-		slog.Debug("Credential matched (prefix)", "url", repoURL, "templateURL", s.templates[best].URL)
+	if best != nil {
+		slog.Debug("Credential matched (prefix)", "url", repoURL, "matchedURL", best.URL)
 
-		return &s.templates[best]
+		return best
+	}
+
+	if strings.HasPrefix(norm, "oci://") {
+		for idx, normURL := range s.normRepos {
+			if !strings.HasPrefix(normURL, "oci://") {
+				continue
+			}
+
+			if (strings.HasPrefix(norm, normURL) || strings.HasPrefix(normURL, norm)) && len(normURL) > bestLen {
+				best, bestLen = &s.repos[idx], len(normURL)
+			}
+		}
+
+		if best != nil {
+			slog.Debug("Credential matched (OCI prefix)", "url", repoURL, "matchedURL", best.URL)
+
+			return best
+		}
 	}
 
 	slog.Debug("No credential found", "url", repoURL)
