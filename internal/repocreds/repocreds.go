@@ -16,33 +16,34 @@ type RepoCred struct {
 	TLSKey   []byte
 }
 
+type normalizedCred struct {
+	norm string
+	cred *RepoCred
+}
+
 // Store matches repository URLs to credentials.
 // Repository secrets use exact URL matching; repo-creds templates use longest-prefix matching.
 // URLs are normalized at construction to avoid repeated parsing during lookups.
 type Store struct {
-	repos     []RepoCred
-	templates []RepoCred
-	normRepos []string
-	normTmpls []string
+	repos     []normalizedCred
+	templates []normalizedCred
 }
 
 // NewStore creates a Store from repository secrets (exact match) and repo-creds templates (prefix match).
 func NewStore(repos, templates []RepoCred) *Store {
-	normRepos := make([]string, len(repos))
+	normRepos := make([]normalizedCred, len(repos))
 	for i := range repos {
-		normRepos[i] = normalizeURL(repos[i].URL)
+		normRepos[i] = normalizedCred{norm: normalizeURL(repos[i].URL), cred: &repos[i]}
 	}
 
-	normTmpls := make([]string, len(templates))
+	normTmpls := make([]normalizedCred, len(templates))
 	for i := range templates {
-		normTmpls[i] = normalizeURL(templates[i].URL)
+		normTmpls[i] = normalizedCred{norm: normalizeURL(templates[i].URL), cred: &templates[i]}
 	}
 
 	return &Store{
-		repos:     repos,
-		templates: templates,
-		normRepos: normRepos,
-		normTmpls: normTmpls,
+		repos:     normRepos,
+		templates: normTmpls,
 	}
 }
 
@@ -62,19 +63,19 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 
 	norm := normalizeURL(repoURL)
 
-	for idx, normURL := range s.normRepos {
-		if normURL == norm {
-			slog.Debug("Credential matched (exact)", "url", repoURL, "secretURL", s.repos[idx].URL)
+	for _, entry := range s.repos {
+		if entry.norm == norm {
+			slog.Debug("Credential matched (exact)", "url", repoURL, "secretURL", entry.cred.URL)
 
-			return &s.repos[idx]
+			return entry.cred
 		}
 	}
 
 	best, bestLen := (*RepoCred)(nil), 0
 
-	for idx, normURL := range s.normTmpls {
-		if strings.HasPrefix(norm, normURL) && len(normURL) > bestLen {
-			best, bestLen = &s.templates[idx], len(normURL)
+	for _, entry := range s.templates {
+		if strings.HasPrefix(norm, entry.norm) && len(entry.norm) > bestLen {
+			best, bestLen = entry.cred, len(entry.norm)
 		}
 	}
 
@@ -85,13 +86,13 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 	}
 
 	if strings.HasPrefix(norm, "oci://") {
-		for idx, normURL := range s.normRepos {
-			if !strings.HasPrefix(normURL, "oci://") {
+		for _, entry := range s.repos {
+			if !strings.HasPrefix(entry.norm, "oci://") {
 				continue
 			}
 
-			if (strings.HasPrefix(norm, normURL) || strings.HasPrefix(normURL, norm)) && len(normURL) > bestLen {
-				best, bestLen = &s.repos[idx], len(normURL)
+			if (strings.HasPrefix(norm, entry.norm) || strings.HasPrefix(entry.norm, norm)) && len(entry.norm) > bestLen {
+				best, bestLen = entry.cred, len(entry.norm)
 			}
 		}
 
