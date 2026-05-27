@@ -2,6 +2,7 @@
 package repocreds
 
 import (
+	"log/slog"
 	"net/url"
 	"strings"
 )
@@ -57,6 +58,8 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 
 	for i, n := range s.normRepos {
 		if n == norm {
+			slog.Debug("Credential matched (exact)", "url", repoURL, "secretURL", s.repos[i].URL)
+
 			return &s.repos[i]
 		}
 	}
@@ -70,8 +73,12 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 	}
 
 	if best >= 0 {
+		slog.Debug("Credential matched (prefix)", "url", repoURL, "templateURL", s.templates[best].URL)
+
 		return &s.templates[best]
 	}
+
+	slog.Debug("No credential found", "url", repoURL)
 
 	return nil
 }

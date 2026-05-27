@@ -48,6 +48,34 @@ type Options struct {
 	TemplateOptions string
 }
 
+type resolvedCred struct {
+	Username string
+	Password string
+	certFile string
+	keyFile  string
+	cleanups []string
+}
+
+// StandardizeArchivePath renames a downloaded chart archive to the canonical
+// <name>-<version>.tgz format if the filename doesn't already match.
+func StandardizeArchivePath(downloadedPath, name, version string) error {
+	expectedPath := filepath.Join(filepath.Dir(downloadedPath), GetArchiveName(name, version))
+	if downloadedPath == expectedPath {
+		return nil
+	}
+
+	slog.Debug("Standardizing chart archive name",
+		"from", filepath.Base(downloadedPath),
+		"to", filepath.Base(expectedPath))
+
+	err := os.Rename(downloadedPath, expectedPath)
+	if err != nil {
+		return fmt.Errorf("failed to rename %s to %s: %w", downloadedPath, expectedPath, err)
+	}
+
+	return nil
+}
+
 // TemplateAndParseYaml reads a YAML file, applies a template to it, and returns the resulting data as a map.
 func TemplateAndParseYaml(
 	file string, options Options,
@@ -99,45 +127,80 @@ func TemplateAndParseYaml(
 	return yamlData, nil
 }
 
-// StaleDependencies returns which Helm chart dependencies need an update.
-func (h *Client) StaleDependencies(ctx context.Context) []*chart.Dependency {
-	if h.UpdateDependencies {
-		return h.Chart.Metadata.Dependencies
-	}
-
-	needUpdate := []*chart.Dependency{}
-
-	for _, dependency := range h.Chart.Metadata.Dependencies {
-		version, err := h.ResolveVersion(ctx, dependency)
-		if err != nil {
-			slog.Warn(
-				"Failed to resolve version for dependency, will attempt update",
-				"name", dependency.Name,
-				"version", dependency.Version,
-				"repository", dependency.Repository,
-				"err", err,
-			)
-
-			needUpdate = append(needUpdate, dependency)
-
-			continue
-		}
-		// Update the dependency version to the resolved one and work with that from now on.
-		dependency.Version = version
-		slog.Debug("Checking dependency: " + dependency.Name + " version: " + version)
-
-		exists := h.lookForArchive(dependency.Name, version)
-		if !exists {
-			slog.Debug("Dependency not found, triggering an update")
-
-			needUpdate = append(needUpdate, dependency)
-		}
-	}
-
-	return needUpdate
+func dependencyKey(dep *chart.Dependency) string {
+	return dep.Name + "|" + dep.Version + "|" + dep.Repository
 }
 
-// HasDependencies checks if the Helm chart has any dependencies defined in its Chart.yaml file.
+func downloadAndStandardize(
+	ctx context.Context, downloader *downloader.ChartDownloader, ref string, dep *chart.Dependency, destDir string,
+) error {
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("download cancelled: %w", ctx.Err())
+	default:
+	}
+
+	downloadedPath, _, err := downloader.DownloadTo(ref, dep.Version, destDir)
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("download cancelled: %w", ctx.Err())
+		}
+
+		return fmt.Errorf("failed to download %s: %w", ref, err)
+	}
+
+	return StandardizeArchivePath(downloadedPath, dep.Name, dep.Version)
+}
+
+func extractOCIHost(repoURL string) string {
+	trimmed := strings.TrimPrefix(repoURL, "oci://")
+
+	host, _, _ := strings.Cut(trimmed, "/")
+
+	return host
+}
+
+func ociLoginOpts(cred *resolvedCred) []ociRegistry.LoginOption {
+	var opts []ociRegistry.LoginOption
+
+	if cred.Username != "" {
+		opts = append(opts, ociRegistry.LoginOptBasicAuth(cred.Username, cred.Password))
+	}
+
+	if cred.certFile != "" && cred.keyFile != "" {
+		opts = append(opts, ociRegistry.LoginOptTLSClientConfig(cred.certFile, cred.keyFile, ""))
+	}
+
+	return opts
+}
+
+func writeTempPEM(data []byte) string {
+	tempFile, err := os.CreateTemp("", "helm-dryer-*.pem")
+	if err != nil {
+		slog.Warn("Failed to create temp PEM file", "err", err)
+
+		return ""
+	}
+
+	defer func() { _ = tempFile.Close() }()
+
+	_, err = tempFile.Write(data)
+	if err != nil {
+		slog.Warn("Failed to write temp PEM file", "err", err)
+
+		return ""
+	}
+
+	return tempFile.Name()
+}
+
+// cleanup removes any temporary PEM files created for TLS credentials.
+func (rc *resolvedCred) cleanup() {
+	for _, path := range rc.cleanups {
+		_ = os.Remove(path)
+	}
+}
+
 func (h *Client) HasDependencies() bool {
 	if h.Chart == nil || h.Chart.Metadata == nil {
 		return false
@@ -146,7 +209,6 @@ func (h *Client) HasDependencies() bool {
 	return len(h.Chart.Metadata.Dependencies) > 0
 }
 
-// LoadChart loads a Helm chart.
 func (h *Client) LoadChart() error {
 	chart, err := loader.LoadDir(h.Path)
 	if err != nil {
@@ -232,6 +294,44 @@ func (h *Client) ReadDependenciesValues() (map[string]any, error) {
 	return vals, nil
 }
 
+// StaleDependencies returns which Helm chart dependencies need an update.
+func (h *Client) StaleDependencies(ctx context.Context) []*chart.Dependency {
+	if h.UpdateDependencies {
+		return h.Chart.Metadata.Dependencies
+	}
+
+	needUpdate := []*chart.Dependency{}
+
+	for _, dependency := range h.Chart.Metadata.Dependencies {
+		version, err := h.ResolveVersion(ctx, dependency)
+		if err != nil {
+			slog.Warn(
+				"Failed to resolve version for dependency, will attempt update",
+				"name", dependency.Name,
+				"version", dependency.Version,
+				"repository", dependency.Repository,
+				"err", err,
+			)
+
+			needUpdate = append(needUpdate, dependency)
+
+			continue
+		}
+		// Update the dependency version to the resolved one and work with that from now on.
+		dependency.Version = version
+		slog.Debug("Checking dependency: " + dependency.Name + " version: " + version)
+
+		exists := h.lookForArchive(dependency.Name, version)
+		if !exists {
+			slog.Debug("Dependency not found, triggering an update")
+
+			needUpdate = append(needUpdate, dependency)
+		}
+	}
+
+	return needUpdate
+}
+
 // UpdateDeps updates the dependencies of a Helm chart located at the specified path.
 // It respects the provided context for cancellation and timeout.
 func (h *Client) UpdateDeps(ctx context.Context, dependencies []*chart.Dependency) error {
@@ -245,7 +345,6 @@ func (h *Client) UpdateDeps(ctx context.Context, dependencies []*chart.Dependenc
 	settings := h.envSettings()
 
 	for _, dep := range dependencies {
-		// Check context before processing each dependency
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("dependency download cancelled: %w", ctx.Err())
@@ -275,81 +374,6 @@ func (h *Client) UpdateDeps(ctx context.Context, dependencies []*chart.Dependenc
 	return nil
 }
 
-// downloadAndStandardize downloads a chart and renames the resulting archive to
-// the canonical format: <name>-<version>.tgz. This handles OCI registries and
-// HTTP repos that may produce non-standard filenames (e.g. suffixes like "-helm"
-// or version prefixes like "v"). It respects the provided context for cancellation.
-func downloadAndStandardize(
-	ctx context.Context, downloader *downloader.ChartDownloader, ref string, dep *chart.Dependency, destDir string,
-) error {
-	// Check context before starting download
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("download cancelled: %w", ctx.Err())
-	default:
-	}
-
-	downloadedPath, _, err := downloader.DownloadTo(ref, dep.Version, destDir)
-	if err != nil {
-		// Check if context was cancelled during download
-		if ctx.Err() != nil {
-			return fmt.Errorf("download cancelled: %w", ctx.Err())
-		}
-
-		return fmt.Errorf("failed to download %s: %w", ref, err)
-	}
-
-	return StandardizeArchivePath(downloadedPath, dep.Name, dep.Version)
-}
-
-// StandardizeArchivePath renames a downloaded chart archive to the canonical
-// <name>-<version>.tgz format if the filename doesn't already match.
-func StandardizeArchivePath(downloadedPath, name, version string) error {
-	expectedPath := filepath.Join(filepath.Dir(downloadedPath), GetArchiveName(name, version))
-	if downloadedPath == expectedPath {
-		return nil
-	}
-
-	slog.Debug("Standardizing chart archive name",
-		"from", filepath.Base(downloadedPath),
-		"to", filepath.Base(expectedPath))
-
-	err := os.Rename(downloadedPath, expectedPath)
-	if err != nil {
-		return fmt.Errorf("failed to rename %s to %s: %w", downloadedPath, expectedPath, err)
-	}
-
-	return nil
-}
-
-// downloadHTTPDependency resolves credentials, finds the chart URL, and downloads an HTTP dependency.
-func (h *Client) downloadHTTPDependency(
-	ctx context.Context, dep *chart.Dependency, chartsDir string, settings *helmCli.EnvSettings,
-) error {
-	repoCred := h.credForURL(dep.Repository)
-	defer repoCred.cleanup()
-
-	chartURL, err := repo.FindChartInRepoURL(
-		dep.Repository, dep.Name, dep.Version,
-		repoCred.certFile, repoCred.keyFile, "",
-		getter.All(settings),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to resolve chart URL for %s: %w", dep.Name, err)
-	}
-
-	slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
-
-	httpDownloader, err := h.chartDownloader(repoCred)
-	if err != nil {
-		return fmt.Errorf("failed to create authenticated downloader for %s: %w", dep.Name, err)
-	}
-
-	return downloadAndStandardize(ctx, httpDownloader, chartURL, dep, chartsDir)
-}
-
-// chartDownloader sets up the proper credentials and cache settings.
-// When rc is set, HTTP basic auth and TLS options are added to the downloader.
 func (h *Client) chartDownloader(repoCred *resolvedCred) (*downloader.ChartDownloader, error) {
 	settings := h.envSettings()
 
@@ -380,23 +404,6 @@ func (h *Client) chartDownloader(repoCred *resolvedCred) (*downloader.ChartDownl
 	}, nil
 }
 
-type resolvedCred struct {
-	Username string
-	Password string
-	certFile string
-	keyFile  string
-	cleanups []string
-}
-
-// cleanup removes any temporary PEM files created for TLS credentials.
-func (rc *resolvedCred) cleanup() {
-	for _, path := range rc.cleanups {
-		_ = os.Remove(path)
-	}
-}
-
-// credForURL resolves credentials for a repository URL from the ArgoCD credential store.
-// Returns an empty resolvedCred (not nil) when no match, so callers skip nil checks.
 func (h *Client) credForURL(repoURL string) *resolvedCred {
 	resolved := &resolvedCred{}
 
@@ -421,33 +428,6 @@ func (h *Client) credForURL(repoURL string) *resolvedCred {
 	return resolved
 }
 
-// writeTempPEM writes PEM data to a temporary file and returns its path.
-func writeTempPEM(data []byte) string {
-	tempFile, err := os.CreateTemp("", "helm-dryer-*.pem")
-	if err != nil {
-		slog.Warn("Failed to create temp PEM file", "err", err)
-
-		return ""
-	}
-
-	defer func() { _ = tempFile.Close() }()
-
-	_, err = tempFile.Write(data)
-	if err != nil {
-		slog.Warn("Failed to write temp PEM file", "err", err)
-
-		return ""
-	}
-
-	return tempFile.Name()
-}
-
-// dependencyKey returns a unique key for deduplication.
-func dependencyKey(dep *chart.Dependency) string {
-	return dep.Name + "|" + dep.Version + "|" + dep.Repository
-}
-
-// deduplicateDependencies remove duplicates from the dependencies list.
 func (h *Client) deduplicateDependencies() {
 	slog.Debug("Deduplicating chart dependencies")
 
@@ -468,7 +448,31 @@ func (h *Client) deduplicateDependencies() {
 	h.Chart.Metadata.Dependencies = dependencies
 }
 
-// envSettings returns a configured Helm EnvSettings instance.
+func (h *Client) downloadHTTPDependency(
+	ctx context.Context, dep *chart.Dependency, chartsDir string, settings *helmCli.EnvSettings,
+) error {
+	repoCred := h.credForURL(dep.Repository)
+	defer repoCred.cleanup()
+
+	chartURL, err := repo.FindChartInRepoURL(
+		dep.Repository, dep.Name, dep.Version,
+		repoCred.certFile, repoCred.keyFile, "",
+		getter.All(settings),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to resolve chart URL for %s: %w", dep.Name, err)
+	}
+
+	slog.Debug("Downloading HTTP dependency", "url", chartURL, "version", dep.Version)
+
+	httpDownloader, err := h.chartDownloader(repoCred)
+	if err != nil {
+		return fmt.Errorf("failed to create authenticated downloader for %s: %w", dep.Name, err)
+	}
+
+	return downloadAndStandardize(ctx, httpDownloader, chartURL, dep, chartsDir)
+}
+
 func (h *Client) envSettings() helmCli.EnvSettings {
 	return helmCli.EnvSettings{
 		Debug:           h.Debug,
@@ -476,7 +480,40 @@ func (h *Client) envSettings() helmCli.EnvSettings {
 	}
 }
 
-// packageLocalDependency packages a local dependency into the charts directory.
+func (h *Client) loginOCIRegistries(registryClient *ociRegistry.Client) {
+	seen := make(map[string]struct{})
+
+	for _, dep := range h.Chart.Metadata.Dependencies {
+		if !ociRegistry.IsOCI(dep.Repository) {
+			continue
+		}
+
+		host := extractOCIHost(dep.Repository)
+		if _, ok := seen[host]; ok {
+			continue
+		}
+
+		seen[host] = struct{}{}
+
+		resolved := h.credForURL(dep.Repository)
+		defer resolved.cleanup()
+
+		opts := ociLoginOpts(resolved)
+		if len(opts) == 0 {
+			slog.Debug("Credential has no auth data, skipping login", "host", host)
+
+			continue
+		}
+
+		slog.Debug("Logging in to OCI registry", "host", host)
+
+		loginErr := registryClient.Login(host, opts...)
+		if loginErr != nil {
+			slog.Warn("Failed to login to OCI registry", "host", host, "err", loginErr)
+		}
+	}
+}
+
 func (h *Client) packageLocalDependency(dep *chart.Dependency, destDir string) error {
 	localPath := strings.TrimPrefix(dep.Repository, LocalRepoPrefix)
 	if !filepath.IsAbs(localPath) {
@@ -500,8 +537,6 @@ func (h *Client) packageLocalDependency(dep *chart.Dependency, destDir string) e
 	return nil
 }
 
-// registryClient creates and authenticates an OCI registry client.
-// Static credentials (via CredsStore exact match) take precedence over ArgoCD templates (prefix match).
 func (h *Client) registryClient() (*ociRegistry.Client, error) {
 	if h.cachedRegistryClient != nil {
 		return h.cachedRegistryClient, nil
@@ -530,44 +565,4 @@ func (h *Client) registryClient() (*ociRegistry.Client, error) {
 	h.cachedRegistryClient = registryClient
 
 	return registryClient, nil
-}
-
-// loginOCIRegistries authenticates to all OCI registries referenced by chart dependencies.
-func (h *Client) loginOCIRegistries(registryClient *ociRegistry.Client) {
-	seen := make(map[string]struct{})
-
-	for _, dep := range h.Chart.Metadata.Dependencies {
-		if !ociRegistry.IsOCI(dep.Repository) {
-			continue
-		}
-
-		host := extractOCIHost(dep.Repository)
-		if _, ok := seen[host]; ok {
-			continue
-		}
-
-		seen[host] = struct{}{}
-
-		cred := h.CredsStore.ForURL(dep.Repository)
-		if cred == nil || cred.Username == "" {
-			continue
-		}
-
-		slog.Debug("Logging in to OCI registry", "host", host)
-
-		loginErr := registryClient.Login(host,
-			ociRegistry.LoginOptBasicAuth(cred.Username, cred.Password))
-		if loginErr != nil {
-			slog.Warn("Failed to login to OCI registry", "host", host, "err", loginErr)
-		}
-	}
-}
-
-// extractOCIHost returns the host (and port) from an oci:// URL.
-func extractOCIHost(repoURL string) string {
-	trimmed := strings.TrimPrefix(repoURL, "oci://")
-
-	host, _, _ := strings.Cut(trimmed, "/")
-
-	return host
 }

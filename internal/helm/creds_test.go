@@ -92,6 +92,78 @@ func TestCredForURL(t *testing.T) {
 	})
 }
 
+func TestOCILoginOpts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("basic auth only", func(t *testing.T) {
+		t.Parallel()
+
+		cred := &resolvedCred{Username: "user", Password: "pass"}
+		opts := ociLoginOpts(cred)
+
+		assert.Len(t, opts, 1)
+	})
+
+	t.Run("TLS only", func(t *testing.T) {
+		t.Parallel()
+
+		cred := &resolvedCred{certFile: "/tmp/cert.pem", keyFile: "/tmp/key.pem"}
+		opts := ociLoginOpts(cred)
+
+		assert.Len(t, opts, 1)
+	})
+
+	t.Run("basic auth and TLS combined", func(t *testing.T) {
+		t.Parallel()
+
+		cred := &resolvedCred{
+			Username: "user",
+			Password: "pass",
+			certFile: "/tmp/cert.pem",
+			keyFile:  "/tmp/key.pem",
+		}
+		opts := ociLoginOpts(cred)
+
+		assert.Len(t, opts, 2)
+	})
+
+	t.Run("no auth data returns empty", func(t *testing.T) {
+		t.Parallel()
+
+		cred := &resolvedCred{}
+		opts := ociLoginOpts(cred)
+
+		assert.Empty(t, opts)
+	})
+
+	t.Run("cert without key returns empty", func(t *testing.T) {
+		t.Parallel()
+
+		cred := &resolvedCred{certFile: "/tmp/cert.pem"}
+		opts := ociLoginOpts(cred)
+
+		assert.Empty(t, opts)
+	})
+
+	t.Run("key without cert returns empty", func(t *testing.T) {
+		t.Parallel()
+
+		cred := &resolvedCred{keyFile: "/tmp/key.pem"}
+		opts := ociLoginOpts(cred)
+
+		assert.Empty(t, opts)
+	})
+
+	t.Run("username without password still produces basic auth", func(t *testing.T) {
+		t.Parallel()
+
+		cred := &resolvedCred{Username: "user"}
+		opts := ociLoginOpts(cred)
+
+		assert.Len(t, opts, 1)
+	})
+}
+
 func TestWriteTempPEM(t *testing.T) {
 	t.Parallel()
 
