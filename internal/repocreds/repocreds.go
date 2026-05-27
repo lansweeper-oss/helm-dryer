@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// OCISchemePrefix is the URL scheme prefix for OCI registries (mirrors registry.OCIScheme + "://").
+const OCISchemePrefix = "oci://"
+
 // RepoCred holds credentials for a single repository or registry.
 type RepoCred struct {
 	URL      string
@@ -85,9 +88,9 @@ func (s *Store) ForURL(repoURL string) *RepoCred {
 		return best
 	}
 
-	if strings.HasPrefix(norm, "oci://") {
+	if strings.HasPrefix(norm, OCISchemePrefix) {
 		for _, entry := range s.repos {
-			if !strings.HasPrefix(entry.norm, "oci://") {
+			if !strings.HasPrefix(entry.norm, OCISchemePrefix) {
 				continue
 			}
 

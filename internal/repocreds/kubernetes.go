@@ -92,8 +92,8 @@ func parseSecret(data map[string][]byte) RepoCred {
 
 	ociEnabled, _ := strconv.ParseBool(string(data["enableOCI"]))
 
-	if ociEnabled && !strings.HasPrefix(repoURL, "oci://") {
-		repoURL = "oci://" + repoURL
+	if ociEnabled && !strings.HasPrefix(repoURL, OCISchemePrefix) {
+		repoURL = OCISchemePrefix + repoURL
 	}
 
 	return RepoCred{
