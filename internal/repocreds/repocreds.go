@@ -31,19 +31,19 @@ type Store struct {
 
 // NewStore creates a Store from repository secrets (exact match) and repo-creds templates (prefix match).
 func NewStore(repos, templates []RepoCred) *Store {
-	normRepos := make([]normalizedCred, len(repos))
+	normalizedRepos := make([]normalizedCred, len(repos))
 	for i := range repos {
-		normRepos[i] = normalizedCred{norm: normalizeURL(repos[i].URL), cred: &repos[i]}
+		normalizedRepos[i] = normalizedCred{norm: normalizeURL(repos[i].URL), cred: &repos[i]}
 	}
 
-	normTmpls := make([]normalizedCred, len(templates))
+	normalizedTemplates := make([]normalizedCred, len(templates))
 	for i := range templates {
-		normTmpls[i] = normalizedCred{norm: normalizeURL(templates[i].URL), cred: &templates[i]}
+		normalizedTemplates[i] = normalizedCred{norm: normalizeURL(templates[i].URL), cred: &templates[i]}
 	}
 
 	return &Store{
-		repos:     normRepos,
-		templates: normTmpls,
+		repos:     normalizedRepos,
+		templates: normalizedTemplates,
 	}
 }
 
