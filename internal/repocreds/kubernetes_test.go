@@ -162,6 +162,56 @@ func TestParseSecret(t *testing.T) {
 		cred := parseSecret(nil)
 		assert.Empty(t, cred.URL)
 	})
+
+	t.Run("enableOCI prepends oci scheme to raw host", func(t *testing.T) {
+		t.Parallel()
+
+		data := map[string][]byte{
+			"url":       []byte("ghcr.io/org"),
+			"enableOCI": []byte("true"),
+			"username":  []byte("user"),
+		}
+
+		cred := parseSecret(data)
+		assert.Equal(t, "oci://ghcr.io/org", cred.URL)
+		assert.Equal(t, "user", cred.Username)
+	})
+
+	t.Run("enableOCI skipped when URL already has oci scheme", func(t *testing.T) {
+		t.Parallel()
+
+		data := map[string][]byte{
+			"url":       []byte("oci://ghcr.io/org"),
+			"enableOCI": []byte("true"),
+		}
+
+		cred := parseSecret(data)
+		assert.Equal(t, "oci://ghcr.io/org", cred.URL)
+	})
+
+	t.Run("enableOCI accepts truthy values", func(t *testing.T) {
+		t.Parallel()
+
+		data := map[string][]byte{
+			"url":       []byte("ghcr.io/org"),
+			"enableOCI": []byte("1"),
+		}
+
+		cred := parseSecret(data)
+		assert.Equal(t, "oci://ghcr.io/org", cred.URL)
+	})
+
+	t.Run("enableOCI false leaves URL unchanged", func(t *testing.T) {
+		t.Parallel()
+
+		data := map[string][]byte{
+			"url":       []byte("ghcr.io/org"),
+			"enableOCI": []byte("false"),
+		}
+
+		cred := parseSecret(data)
+		assert.Equal(t, "ghcr.io/org", cred.URL)
+	})
 }
 
 func TestFetchSecrets_TLSCertData(t *testing.T) {

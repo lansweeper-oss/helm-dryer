@@ -93,7 +93,7 @@ func buildCredsStore(ctx context.Context, credentials *cli.Credentials) *repoCre
 
 	if credentials.Username != "" && credentials.Password != "" && credentials.Registry != "" {
 		repos = append(repos, repoCredentials.RepoCred{
-			URL:      "oci://" + credentials.Registry,
+			URL:      repoCredentials.OCISchemePrefix + credentials.Registry,
 			Username: credentials.Username,
 			Password: credentials.Password,
 		})

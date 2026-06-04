@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,9 +85,19 @@ func fetchSecrets(
 }
 
 // parseSecret extracts credential fields from a Kubernetes secret's data map.
+// When enableOCI is "true", the URL scheme is rewritten to oci:// so that
+// prefix matching works against OCI chart dependency references.
 func parseSecret(data map[string][]byte) RepoCred {
+	repoURL := string(data["url"])
+
+	ociEnabled, _ := strconv.ParseBool(string(data["enableOCI"]))
+
+	if ociEnabled && !strings.HasPrefix(repoURL, OCISchemePrefix) {
+		repoURL = OCISchemePrefix + repoURL
+	}
+
 	return RepoCred{
-		URL:      string(data["url"]),
+		URL:      repoURL,
 		Username: string(data["username"]),
 		Password: string(data["password"]),
 		TLSCert:  data["tlsClientCertData"],

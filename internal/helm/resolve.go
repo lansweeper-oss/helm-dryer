@@ -8,6 +8,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/lansweeper-oss/helm-dryer/internal/errors"
+	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	helmCli "helm.sh/helm/v3/pkg/cli"
@@ -170,7 +171,7 @@ func (h *Client) resolveOCIVersion(ctx context.Context, dep *chart.Dependency) (
 		return "", fmt.Errorf("failed to create registry client: %w", err)
 	}
 
-	ref := strings.TrimPrefix(dep.Repository, "oci://") + "/" + dep.Name
+	ref := strings.TrimPrefix(dep.Repository, repocreds.OCISchemePrefix) + "/" + dep.Name
 
 	tags, err := registryClient.Tags(ref)
 	if err != nil {

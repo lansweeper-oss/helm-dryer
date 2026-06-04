@@ -1,4 +1,4 @@
-# helm-dryer ![Coverage](coverage.svg) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE_INT}%25-${COVERAGE_COLOR}) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -414,19 +414,17 @@ When running `dryer` container with a `readOnlyRootFilesystem: true` security co
 [...]
 ```
 
-### Two-pass implementation
+### Two-pass rendering
 
-This is initially introduced as an experimental feature, since there might be potential issues when
-rendering the values twice. Internally, the values files are first rendered from the injected
-`valueObject`, then we use that result (merged with the input `valueObject` again) as
-the "_values for the values_". This includes all the go-template/sprig modifications in the
-resulting values.
-Besides that, for Umbrella charts we'll get the rendered values in a nested map (this might change
-in the future), e.g. `index .Values "aws-load-balancer-controller" "foo"`.
+#### Why
 
-Two-pass rendering can also be beneficial when splitting configurations across multiple template
-files becomes necessary, allowing cross-file value references without taking into account the
-order in which files are read. For example:
+In a single-pass render, `.Values` only contains the injected `valuesObject` parameters. Go
+template variables (`$var`) can avoid repetition within a single file, but they are scoped to that
+template execution — they cannot be shared across files. When values that depend on each other
+live in the same file, prefer using `$var` instead of enabling two-pass.
+
+Two-pass is only needed when values are split across different files and one file needs to
+reference a computed value from another:
 
 `values.tpl.yaml`
 
@@ -439,12 +437,46 @@ roles:
 {{- end }}
 ```
 
-Override: `values.stg.tpl.yaml`
+`values.stg.tpl.yaml` (environment override)
 
 ```yaml
 admins:
   - a-team
 ```
+
+In single-pass, `roles` is always empty: when `values.tpl.yaml` renders, `.Values.admins` only
+has `valuesObject` entries. The override from `values.stg.tpl.yaml` isn't merged into `.Values`
+yet. With two-pass, Pass 1 merges all files so `admins` contains `a-team`, and Pass 2 renders the
+`range` loop correctly.
+
+#### How it works
+
+When `twoPass` is enabled, the plugin renders the values files twice:
+
+1. **Pass 1**: Render values files using the injected `valuesObject` as `.Values` with
+   `missingkey=default` (missing references resolve to empty instead of erroring). This produces
+   a partially or fully resolved set of values.
+2. **Pass 2**: Merge the Pass 1 output back with the original `valuesObject`, then render the
+   values files again using this merged result as `.Values` with `missingkey=error`.
+
+```mermaid
+graph LR
+  A[valuesObject] --> |".Values"| B["Pass 1 (missingkey=default)"]
+  B --> C[Resolved Values]
+  C --> |merge with valuesObject| D["Pass 2 (missingkey=error)"]
+  D --> E[Final Values]
+```
+
+#### Umbrella charts
+
+For Umbrella charts, two-pass resolved values are available in a nested map keyed by dependency
+name, e.g. `index .Values "aws-load-balancer-controller" "foo"`.
+
+#### Caveats
+
+This is an **experimental** feature. Rendering twice may produce unexpected results if templates
+have side effects or if the output of Pass 1 introduces new template syntax that gets interpreted
+in Pass 2. Instead, define variables or duplicate the template whenever possible.
 
 ### Logging
 
@@ -455,6 +487,12 @@ the CMP protocol streams `stdout` as the manifest output and throws away `stderr
 
 For this reason, even when `--debug` is set nothing is shown in the container logs.
 You'd only see them if an application fails to render, or if you use `Dryer` as a CLI.
+
+## Authentication
+
+See [docs/authentication.md](docs/authentication.md) for a detailed guide on configuring
+credentials for OCI registries and HTTP Helm repositories, including basic auth, TLS client
+certificates, Docker credentials files, and Kubernetes secret integration.
 
 ## ArgoCD integration
 
