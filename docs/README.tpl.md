@@ -578,6 +578,10 @@ ko build --base-import-paths [--tags ...]
 go test ./... -cover
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for development guidelines.
+
 <!-- Links -->
 [1]: https://argo-cd.readthedocs.io/en/stable/user-guide/build-environment/
 [Builtin objects]: https://helm.sh/docs/chart_template_guide/builtin_objects/
