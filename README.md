@@ -1,6 +1,6 @@
-<!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
+<!-- DO NOT EDIT: This file is auto-generated from /home/jesus-fernandez/repos/helm-dryer/docs/README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-73%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-72%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -846,6 +846,10 @@ ko build --base-import-paths [--tags ...]
 ```bash
 go test ./... -cover
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for development guidelines.
 
 <!-- Links -->
 [1]: https://argo-cd.readthedocs.io/en/stable/user-guide/build-environment/

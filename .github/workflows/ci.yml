@@ -96,7 +96,7 @@ jobs:
 
       - name: Generate README with coverage
         run: |
-          COVERAGE=$(go tool cover -func=coverage.out | awk '/total:/{print $3}') ./generate-readme.sh
+          COVERAGE=$(go tool cover -func=coverage.out | awk '/total:/{print $3}') ./docs/generate-readme.sh
 
       - name: Commit README if changed
         env:
