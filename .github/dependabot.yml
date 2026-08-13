@@ -8,6 +8,6 @@ updates:
     allow:
       - dependency-type: direct
   - package-ecosystem: "github-actions"
-    directory: .github/workflows
+    directory: "/"
     schedule:
       interval: weekly

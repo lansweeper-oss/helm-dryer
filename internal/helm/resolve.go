@@ -9,12 +9,12 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/lansweeper-oss/helm-dryer/internal/errors"
 	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chartutil"
-	helmCli "helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/getter"
-	ociRegistry "helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
+	chartutil "helm.sh/helm/v4/pkg/chart/v2/util"
+	helmCli "helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/getter"
+	ociRegistry "helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 // FindBestVersionMatch returns the newest version that satisfies the given version constraint.

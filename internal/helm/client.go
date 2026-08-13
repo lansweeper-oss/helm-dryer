@@ -14,14 +14,14 @@ import (
 	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/lansweeper-oss/helm-dryer/internal/values"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	helmCli "helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/downloader"
-	"helm.sh/helm/v3/pkg/getter"
-	ociRegistry "helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
+	"helm.sh/helm/v4/pkg/chart/v2/loader"
+	chartutil "helm.sh/helm/v4/pkg/chart/v2/util"
+	helmCli "helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/downloader"
+	"helm.sh/helm/v4/pkg/getter"
+	ociRegistry "helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 const (
@@ -398,6 +398,7 @@ func (h *Client) chartDownloader(repoCred *resolvedCred) (*downloader.ChartDownl
 		Out:             os.Stderr,
 		Verify:          downloader.VerifyNever,
 		RepositoryCache: settings.RepositoryCache,
+		ContentCache:    settings.RepositoryCache,
 		RegistryClient:  registryClient,
 		Getters:         getter.All(&settings),
 		Options:         opts,
@@ -455,9 +456,11 @@ func (h *Client) downloadHTTPDependency(
 	defer repoCred.cleanup()
 
 	chartURL, err := repo.FindChartInRepoURL(
-		dep.Repository, dep.Name, dep.Version,
-		repoCred.certFile, repoCred.keyFile, "",
+		dep.Repository, dep.Name,
 		getter.All(settings),
+		repo.WithChartVersion(dep.Version),
+		repo.WithUsernamePassword(repoCred.Username, repoCred.Password),
+		repo.WithClientTLS(repoCred.certFile, repoCred.keyFile, ""),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to resolve chart URL for %s: %w", dep.Name, err)

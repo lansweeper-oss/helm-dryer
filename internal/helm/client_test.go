@@ -12,7 +12,7 @@ import (
 	utils "github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/chart"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
 )
 
 func TestStaleDependencies(t *testing.T) {
