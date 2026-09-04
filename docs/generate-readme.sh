@@ -70,7 +70,7 @@ generate_from_template() {
     done < "${template_file}" > "${temp_file}"
 
     {
-      echo "<!-- DO NOT EDIT: This file is auto-generated from ${template_file} by $(basename "$0"). -->"
+      echo "<!-- DO NOT EDIT: This file is auto-generated from $(basename "${template_file}") by $(basename "$0"). -->"
       echo ""
       cat "${temp_file}"
     } > "${output_file}"

@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT: This file is auto-generated from /home/runner/work/helm-dryer/helm-dryer/docs/README.tpl.md by generate-readme.sh. -->
+<!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
 # helm-dryer ![Coverage](https://img.shields.io/badge/coverage-72%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 

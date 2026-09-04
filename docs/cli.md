@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT: This file is auto-generated from /home/jesus-fernandez/repos/helm-dryer/docs/cli.tpl.md by generate-readme.sh. -->
+<!-- DO NOT EDIT: This file is auto-generated from cli.tpl.md by generate-readme.sh. -->
 
 # CLI Reference
 
