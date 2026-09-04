@@ -7,8 +7,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/lansweeper-oss/helm-dryer/internal/errors"
 	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
+	"github.com/lansweeper-oss/helm-dryer/internal/values"
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/chart/common"
 	"helm.sh/helm/v4/pkg/chart/v2/loader"
@@ -70,6 +72,11 @@ func (in *Input) TemplateChart(ctx context.Context) error {
 }
 
 func (in *Input) renderChart(vals map[string]any) error {
+	// Keep Helm v3 behaviour, where nil values are considered "empty" and not explicitly nil
+	if in.Settings.StripNullValues {
+		values.StripNilValues(vals)
+	}
+
 	folderOutput := in.UsingFolderAsOutput()
 
 	chartLoader, err := loader.Loader(in.Settings.Path)
@@ -103,7 +110,7 @@ func (in *Input) renderChart(vals map[string]any) error {
 
 	rel, ok := result.(*release.Release)
 	if !ok {
-		return fmt.Errorf("unexpected release type: %T", result)
+		return fmt.Errorf("%w: %T", errors.ErrUnexpectedReleaseType, result)
 	}
 
 	// If output is a folder, hooks and tests are already ignored (not written to a file).

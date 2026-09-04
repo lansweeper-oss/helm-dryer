@@ -31,8 +31,8 @@ linters:
     - cyclop # redudant with gocyclo
     - depguard
     - exhaustruct
+    - exhaustruct_v5
     - gomodguard
-    - tagalign
     - wsl
   settings:
     funlen:
@@ -80,6 +80,10 @@ linters:
         rangeValCopy:
           sizeThreshold: 32
 
+    tagalign:
+      align: false
+      sort: true
+
     revive:
       rules:
         # What if I want to name my package `utils`?
@@ -93,6 +97,11 @@ linters:
 
   exclusions:
     rules:
+      # Struct tag alignment may exceed line length limits.
+      - path: internal/cli/cli\.go
+        linters:
+          - lll
+
       # Exclude some linters from running on tests files.
       - path: _test(ing)?\.go
         linters:

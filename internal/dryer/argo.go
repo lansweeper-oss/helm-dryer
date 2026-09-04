@@ -77,6 +77,10 @@ func (in *Input) readSettingsParameters(param *argo.Parameter) {
 		in.Data.ReleaseNamespace = val
 	}
 
+	if val, ok := param.Map["stripNullValues"]; ok {
+		in.Settings.StripNullValues = utils.ToBoolean(val)
+	}
+
 	if val, ok := param.Map["skipCRDs"]; ok {
 		in.Settings.SkipCRDs = utils.ToBoolean(val)
 	}

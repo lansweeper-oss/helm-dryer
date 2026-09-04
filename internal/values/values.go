@@ -32,6 +32,19 @@ func MergeYAMLArrayOfMaps(maps []map[string]any) (map[string]any, error) {
 	return merged, nil
 }
 
+// StripNilValues recursively removes nil entries from a map.
+// Helm v4 preserves explicit null values (e.g. `key: ~`) in the values map, which
+// causes template functions like `regexMatch` to fail with "invalid value; expected string".
+func StripNilValues(m map[string]any) {
+	for key, val := range m {
+		if val == nil {
+			delete(m, key)
+		} else if sub, ok := val.(map[string]any); ok {
+			StripNilValues(sub)
+		}
+	}
+}
+
 // DotNotationToMap reads a map[string]string coming from CLI input by supporting nested keys using
 // dot notation (e.g., "key.subkey").
 func DotNotationToMap(m map[string]string) (map[string]any, error) {

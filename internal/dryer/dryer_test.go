@@ -99,6 +99,7 @@ func setupTest(t *testing.T, testFiles []string) *dryer.Input {
 	}
 
 	setup.Settings.UpdateDependencies = false
+	setup.Settings.StripNullValues = true
 	setup.Settings.Logging.Debug = true
 	setup.Settings.Logging.Format = "text"
 
