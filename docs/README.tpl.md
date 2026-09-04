@@ -216,7 +216,8 @@ The following keys are expected under `ARGOCD_APP_PARAMETERS`:
   `values.yaml` may be required when using raw values.
 - `valuesObject`, an optional map of input values.
 - `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values in templated value files.
-- `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before rendering. Restores Helm v3 behavior where explicit null entries are removed instead of passed to template functions.
+- `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before
+  rendering. Restores Helm v3 behavior where explicit null entries are removed.
 - `ignoreMissing` [optional: `false`] a flag indicating if missing values files are ignored.
 - `skipCRDs` [optional: `false`] a flag to skip installation of CRDs by the Helm chart.
 - `skipSchemaValidation` [optional: `false`] a flag to skip JSON schema validation.
@@ -297,7 +298,7 @@ Functions like `dig` would return the default value when encountering `nil`.
 
 In Helm v4, `nil` values are preserved and passed through to template functions, which can cause errors like:
 
-```
+```text
 invalid value; expected string
 ```
 
