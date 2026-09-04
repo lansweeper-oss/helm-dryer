@@ -172,13 +172,11 @@ In order to check the usage of the tool, do:
 
 <!-- CMD: -->
 
+For the full CLI reference of each command, see [docs/cli.md](docs/cli.md).
+
 ### Render values
 
 An example of (pre)rendering a set of values files follows:
-
-<!-- CMD: get -->
-
-Example:
 
 ```shell
 go run . get -f tests/values.tpl.yaml -f tests/values.stg.tpl.yaml --set clusterName=eks-cluster-platform,partition=aws,accountId=234796234 --set namePrefixWithoutDomain=eks-cluster
@@ -197,7 +195,7 @@ url: example.com/{{ .Values.foo }}  # would produce example.com/bar
 
 ### Template a Helm chart
 
-<!-- CMD: template -->
+The `template` command additionally supports `-A` (application spec) and `-H` (disable hooks) flags.
 
 For example:
 
@@ -211,15 +209,15 @@ go run . template -f tests/values.yaml -f tests/values.tpl.yaml -f tests/values.
 
 This is essentially a wrapper on `template`, but assumes some information is passed as environment variables.
 
-<!-- CMD: render -->
-
 The following keys are expected under `ARGOCD_APP_PARAMETERS`:
 
 - `valueFiles`, a list of files containing values. If a file is missing, it will produce an error if
   the `ignoreMissing` flag is not enabled. No assumptions are made, and an explicit entry for
   `values.yaml` may be required when using raw values.
 - `valuesObject`, an optional map of input values.
-- `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values.
+- `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values in templated value files.
+- `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before
+  rendering. Restores Helm v3 behavior where explicit null entries are removed.
 - `ignoreMissing` [optional: `false`] a flag indicating if missing values files are ignored.
 - `skipCRDs` [optional: `false`] a flag to skip installation of CRDs by the Helm chart.
 - `skipSchemaValidation` [optional: `false`] a flag to skip JSON schema validation.
@@ -260,8 +258,6 @@ Application, directly from its spec. The file can be either in YAML or JSON form
 
 > This command assumes the input comes from `-p` rather than parameters like `-f` or `-v`.
 
-<!-- CMD: render-app -->
-
 See the Application spec example from `render` for a reference about the expected fields.
 
 ### Environment variables
@@ -275,7 +271,8 @@ This plugin accepts optional settings to control its behavior. The following set
 supported:
 
 - `disableHooks` - Do not render Helm hooks.
-- `ignoreEmpty` - Do not raise an error when a specific value is empty / null.
+- `ignoreEmpty` - Do not raise an error when a specific value is empty / null in templated value files.
+- `stripNullValues` - Strip null values (`key: ~`) from chart values before rendering, restoring Helm v3 behavior.
 - `ignoreMissing` - Do not raise an error when a values file is missing.
 - `skipCRDs` - Skip the CRDs if embedded in the Helm chart.
 - `skipSchemaValidation` - Skip JSON schema validation.
@@ -291,6 +288,34 @@ supported:
 These settings can be customized per-application and override the global (CLI argument) ones.
 
 ## Known limitations and caveats
+
+### Null values in Helm v4
+
+Helm v4 changed how explicit null values (`key: ~`) are handled in the values map.
+
+In Helm v3, these entries were effectively ignored during template rendering.
+Functions like `dig` would return the default value when encountering `nil`.
+
+In Helm v4, `nil` values are preserved and passed through to template functions, which can cause errors like:
+
+```text
+invalid value; expected string
+```
+
+This happens when a template function (e.g. `regexMatch`, `printf`) receives a `nil` value instead
+of the expected type.
+
+To restore the Helm v3 behavior, enable the `--strip-null-values` flag (or `stripNullValues` in
+the ArgoCD plugin settings). This recursively removes all `nil` entries from the chart values before
+passing them to Helm's template engine.
+
+```yaml
+# ArgoCD Application example
+parameters:
+  - name: settings
+    map:
+      stripNullValues: "true"
+```
 
 ### Explicit values.yaml declaration
 

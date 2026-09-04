@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# Script to generate README.md from README.template.md by executing commands and injecting their output
+# Script to generate documentation from templates by executing commands and injecting their output.
+# Processes any .tpl.md file in the docs directory, replacing <!-- CMD: X --> markers with
+# the output of `go run . X --help`.
 
 set -e
 
@@ -21,60 +23,64 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 HEADER='```shell'
 FOOTER='```'
-TEMPLATE_FILE="${SCRIPT_DIR}/README.tpl.md"
-OUTPUT_FILE="${SCRIPT_DIR}/../README.md"
 
-if [ ! -f "${TEMPLATE_FILE}" ]; then
-    echo "Error: ${TEMPLATE_FILE} not found"
-    exit 1
-fi
+# Process a single template file into its output location.
+# Usage: generate_from_template <template_file> <output_file>
+generate_from_template() {
+    local template_file="$1"
+    local output_file="$2"
 
-echo "Generating ${OUTPUT_FILE} from ${TEMPLATE_FILE}..."
-
-# Create temporary file
-TEMP_FILE=$(mktemp)
-trap 'rm -f "$TEMP_FILE"' EXIT
-
-# Process the template file line by line
-while IFS= read -r line; do
-    # Substitute environment variables
-    line=$(echo "$line" | envsubst '$COVERAGE_INT $COVERAGE_COLOR')
-
-    # Check if line contains EXEC comment
-    if echo "$line" | grep -q "<!-- CMD:"; then
-        # Extract the command from the CMD comment using bash parameter expansion.
-        temp="${line#*<!-- CMD: }"  # Remove everything up to and including "<!-- CMD: "
-        command="${temp%-->*}"      # Remove everything from " -->" to the end
-        command=$(echo "$command" | xargs)
-
-        echo "${HEADER}"
-        echo -e "go run . ${command} --help\n"
-
-        # Execute the command and capture output
-        # Filter out the maxprocs log line that appears in go run output
-        # Safely split the command into an array to avoid word splitting and injection
-        read -r -a cmd_args <<< "${command}"
-        if output=$(go run . "${cmd_args[@]}" --help 2>&1); then
-            filtered_output=$(echo "${output}" | grep -v "maxprocs: Leaving GOMAXPROCS" || true)
-            echo "${filtered_output}"
-        else
-            echo "Error executing command: go run . ${command} --help" >&2
-            echo "${output}" >&2
-            exit 1
-        fi
-        echo "${FOOTER}"
-    else
-        # Regular line, just copy it
-        echo "${line}"
+    if [ ! -f "${template_file}" ]; then
+        echo "Error: ${template_file} not found"
+        exit 1
     fi
-done < "${TEMPLATE_FILE}" > "${TEMP_FILE}"
 
-# Prepend auto-generated notice and move the temporary file to the final output
-{
-  echo "<!-- DO NOT EDIT: This file is auto-generated from ${TEMPLATE_FILE} by $(basename "$0"). -->"
-  echo ""
-  cat "${TEMP_FILE}"
-} > "${OUTPUT_FILE}"
-rm -f "${TEMP_FILE}"
+    echo "Generating ${output_file} from ${template_file}..."
 
-echo "Successfully generated ${OUTPUT_FILE}"
+    local temp_file
+    temp_file=$(mktemp)
+
+    while IFS= read -r line; do
+        if [ -n "$COVERAGE" ]; then
+            line=$(echo "$line" | envsubst '$COVERAGE_INT $COVERAGE_COLOR')
+        fi
+
+        if echo "$line" | grep -q "<!-- CMD:"; then
+            temp="${line#*<!-- CMD: }"
+            command="${temp%-->*}"
+            command=$(echo "$command" | xargs)
+
+            echo "${HEADER}"
+            echo -e "go run . ${command} --help\n"
+
+            read -r -a cmd_args <<< "${command}"
+            if output=$(go run . "${cmd_args[@]}" --help 2>&1); then
+                filtered_output=$(echo "${output}" | grep -v "maxprocs: Leaving GOMAXPROCS" || true)
+                echo "${filtered_output}"
+            else
+                echo "Error executing command: go run . ${command} --help" >&2
+                echo "${output}" >&2
+                rm -f "${temp_file}"
+                exit 1
+            fi
+            echo "${FOOTER}"
+        else
+            echo "${line}"
+        fi
+    done < "${template_file}" > "${temp_file}"
+
+    {
+      echo "<!-- DO NOT EDIT: This file is auto-generated from $(basename "${template_file}") by $(basename "$0"). -->"
+      echo ""
+      cat "${temp_file}"
+    } > "${output_file}"
+    rm -f "${temp_file}"
+
+    echo "Successfully generated ${output_file}"
+}
+
+# Generate README.md from README.tpl.md
+generate_from_template "${SCRIPT_DIR}/README.tpl.md" "${SCRIPT_DIR}/../README.md"
+
+# Generate docs/cli.md from docs/cli.tpl.md
+generate_from_template "${SCRIPT_DIR}/cli.tpl.md" "${SCRIPT_DIR}/cli.md"

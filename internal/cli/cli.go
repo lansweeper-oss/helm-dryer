@@ -2,52 +2,53 @@ package cli
 
 // AppSettings holds the Helm-specific settings for the application.
 type AppSettings struct {
-	ApplicationSpec string `short:"A" type:"existingfile" help:"Path to the Application spec file." yaml:"applicationSpec"`
-	DisableHooks    bool   `short:"H" help:"Disable Helm hooks."`
+	ApplicationSpec string `help:"Path to the Application spec file." short:"A" type:"existingfile" yaml:"applicationSpec"`
+	DisableHooks    bool   `help:"Disable Helm hooks."                short:"H"`
 }
 
 // Credentials holds the configuration for OCI registry credentials.
 type Credentials struct {
-	File      string `type:"existingfile" help:"Path to OCI registry credentials file." yaml:"file"`
-	Namespace string `env:"ARGOCD_NAMESPACE" help:"Kubernetes namespace for ArgoCD secrets." yaml:"namespace"`
-	Password  string `type:"string" env:"OCI_PASSWORD" help:"OCI registry password." json:"-" yaml:"password"`
-	Registry  string `type:"string" default:"ghcr.io" env:"OCI_REGISTRY" help:"OCI registry URL." yaml:"registry"`
+	File      string `help:"Path to OCI registry credentials file."                      type:"existingfile"                             yaml:"file"`
+	Namespace string `env:"ARGOCD_NAMESPACE"                                             help:"Kubernetes namespace for ArgoCD secrets." yaml:"namespace"`
+	Password  string `env:"OCI_PASSWORD"                                                 help:"OCI registry password."                   json:"-"                 type:"string"   yaml:"password"`
+	Registry  string `default:"ghcr.io"                                                  env:"OCI_REGISTRY"                              help:"OCI registry URL." type:"string"   yaml:"registry"`
 	Secret    bool   `help:"Read repository credentials from ArgoCD Kubernetes secrets." yaml:"secret"`
-	Username  string `type:"string" env:"OCI_USERNAME" help:"OCI registry username." yaml:"username"`
+	Username  string `env:"OCI_USERNAME"                                                 help:"OCI registry username."                   type:"string"            yaml:"username"`
 }
 
 // Data holds all the possible values feeding the application.
 type Data struct {
-	APIVersions      []string          `short:"a" default:"" help:"API versions (capabilities)." env:"KUBE_API_VERSIONS"`
-	Files            []string          `short:"f" type:"string" help:"Values files relative to Path."`
-	KubeVersion      string            `short:"k" default:"" help:"Kubernetes version." env:"KUBE_VERSION"`
-	ReleaseName      string            `short:"r" env:"ARGOCD_APP_NAME" help:"Release name."`
-	ReleaseNamespace string            `short:"n" env:"ARGOCD_APP_NAMESPACE" help:"Release namespace."`
-	Set              map[string]string `short:"v" mapsep:"," help:"Injected key value pairs."`
+	APIVersions      []string          `default:""                            env:"KUBE_API_VERSIONS"   help:"API versions (capabilities)." short:"a"`
+	Files            []string          `help:"Values files relative to Path." short:"f"                 type:"string"`
+	KubeVersion      string            `default:""                            env:"KUBE_VERSION"        help:"Kubernetes version."          short:"k"`
+	ReleaseName      string            `env:"ARGOCD_APP_NAME"                 help:"Release name."      short:"r"`
+	ReleaseNamespace string            `env:"ARGOCD_APP_NAMESPACE"            help:"Release namespace." short:"n"`
+	Set              map[string]string `help:"Injected key value pairs."      mapsep:","                short:"v"`
 }
 
 // Logging holds the logging configuration for the application.
 type Logging struct {
 	Debug  bool   `help:"Emit debug logs in addition to info logs."`
-	Format string `enum:"json,console" default:"json" help:"Log format (json|console)."`
+	Format string `default:"json"                                   enum:"json,console" help:"Log format (json|console)."`
 }
 
 // Settings holds the Dryer-specific settings.
 type Settings struct {
-	Credentials          Credentials `embed:"" prefix:"credentials." help:"OCI registry credentials."`
-	DelimLeft            string      `short:"L" default:"{{" help:"Template left delimiter."`
-	DelimRight           string      `short:"R" default:"}}" help:"Template right delimiter."`
-	IgnoreEmpty          bool        `short:"I" help:"Ignore empty/null values."`
-	IgnoreMainValues     bool        `short:"m" help:"When present, ignore the implicit load of main values.yaml file."`
-	IgnoreMissing        bool        `short:"i" help:"Ignore missing values files."`
-	Logging              Logging     `embed:"" prefix:"logging." help:"Logging configuration."`
-	Out                  string      `short:"o" default:"" help:"Output file (default: stdout)."`
-	Path                 string      `short:"p" default:"." type:"existingdir" help:"Relative path to the chart."`
-	SkipCRDs             bool        `name:"skip-crds" help:"Skip CRDs in the templated output."`
+	Credentials          Credentials `embed:""                                                                help:"OCI registry credentials."             prefix:"credentials."`
+	DelimLeft            string      `default:"{{"                                                            help:"Template left delimiter."              short:"L"`
+	DelimRight           string      `default:"}}"                                                            help:"Template right delimiter."             short:"R"`
+	IgnoreEmpty          bool        `help:"Ignore empty/null values in templated value files."               short:"I"`
+	IgnoreMainValues     bool        `help:"When present, ignore the implicit load of main values.yaml file." short:"m"`
+	IgnoreMissing        bool        `help:"Ignore missing values files."                                     short:"i"`
+	Logging              Logging     `embed:""                                                                help:"Logging configuration."                prefix:"logging."`
+	Out                  string      `default:""                                                              help:"Output file (default: stdout)."        short:"o"`
+	Path                 string      `default:"."                                                             help:"Relative path to the chart."           short:"p"                                type:"existingdir"`
+	SkipCRDs             bool        `help:"Skip CRDs in the templated output."                               name:"skip-crds"`
 	SkipSchemaValidation bool        `help:"Disable JSON schema validation."`
 	SkipTests            bool        `help:"Skip tests from templated output."`
-	Timeout              string      `short:"T" env:"DRYER_TIMEOUT" default:"90s" help:"Operation timeout (e.g. 30s, 2m)."`
-	TTL                  string      `short:"t" env:"CACHE_TIMEOUT" help:"Time-to-live in time.Duration format."`
-	TwoPass              bool        `short:"2" help:"Experimental. Perform a two-pass render."`
-	UpdateDependencies   bool        `short:"u" help:"Always update dependencies."`
+	StripNullValues      bool        `help:"Strip null values before rendering. Restores Helm v3 behavior."`
+	Timeout              string      `default:"90s"                                                           env:"DRYER_TIMEOUT"                          help:"Operation timeout (e.g. 30s, 2m)." short:"T"`
+	TTL                  string      `env:"CACHE_TIMEOUT"                                                     help:"Time-to-live in time.Duration format." short:"t"`
+	TwoPass              bool        `help:"Experimental. Perform a two-pass render."                         short:"2"`
+	UpdateDependencies   bool        `help:"Always update dependencies."                                      short:"u"`
 }

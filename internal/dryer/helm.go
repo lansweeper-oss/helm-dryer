@@ -7,12 +7,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/lansweeper-oss/helm-dryer/internal/errors"
 	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/release"
+	"github.com/lansweeper-oss/helm-dryer/internal/values"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/v2/loader"
+	release "helm.sh/helm/v4/pkg/release/v1"
 )
 
 // UsingFolderAsOutput checks if the output setting is a folder and resets to stdout if the output is invalid.
@@ -70,6 +72,11 @@ func (in *Input) TemplateChart(ctx context.Context) error {
 }
 
 func (in *Input) renderChart(vals map[string]any) error {
+	// Keep Helm v3 behaviour, where nil values are considered "empty" and not explicitly nil
+	if in.Settings.StripNullValues {
+		values.StripNilValues(vals)
+	}
+
 	folderOutput := in.UsingFolderAsOutput()
 
 	chartLoader, err := loader.Loader(in.Settings.Path)
@@ -96,9 +103,14 @@ func (in *Input) renderChart(vals map[string]any) error {
 		chart.Values = map[string]any{}
 	}
 
-	rel, err := helmClient.Run(chart, vals)
+	result, err := helmClient.Run(chart, vals)
 	if err != nil {
 		return fmt.Errorf("could not render helm chart correctly: %w", err)
+	}
+
+	rel, ok := result.(*release.Release)
+	if !ok {
+		return fmt.Errorf("%w: %T", errors.ErrUnexpectedReleaseType, result)
 	}
 
 	// If output is a folder, hooks and tests are already ignored (not written to a file).
@@ -138,8 +150,7 @@ func (in *Input) renderChart(vals map[string]any) error {
 // The client is delivered prepared to run a local dry-run "install" operation.
 func (in *Input) buildHelmClient(folderOutput bool) (*action.Install, error) {
 	helmClient := action.NewInstall(&action.Configuration{})
-	helmClient.ClientOnly = true
-	helmClient.DryRun = true
+	helmClient.DryRunStrategy = action.DryRunClient
 	helmClient.IncludeCRDs = !in.Settings.SkipCRDs
 	helmClient.SkipCRDs = in.Settings.SkipCRDs
 	helmClient.SkipSchemaValidation = in.Settings.SkipSchemaValidation
@@ -149,7 +160,7 @@ func (in *Input) buildHelmClient(folderOutput bool) (*action.Install, error) {
 	}
 
 	if in.Data.KubeVersion != "" {
-		kubeVersion, err := chartutil.ParseKubeVersion(in.Data.KubeVersion)
+		kubeVersion, err := common.ParseKubeVersion(in.Data.KubeVersion)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing Kubernetes version: %w", err)
 		}

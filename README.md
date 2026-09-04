@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT: This file is auto-generated from /home/jesus-fernandez/repos/helm-dryer/docs/README.tpl.md by generate-readme.sh. -->
+<!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
 # helm-dryer ![Coverage](https://img.shields.io/badge/coverage-72%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -203,7 +203,8 @@ Flags:
                                    OCI registry username ($OCI_USERNAME).
   -L, --delim-left="{{"            Template left delimiter.
   -R, --delim-right="}}"           Template right delimiter.
-  -I, --ignore-empty               Ignore empty/null values.
+  -I, --ignore-empty               Ignore empty/null values in templated value
+                                   files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.
@@ -214,6 +215,8 @@ Flags:
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
+      --strip-null-values          Strip null values before rendering. Restores
+                                   Helm v3 behavior.
   -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
                                    ($DRYER_TIMEOUT).
   -t, --ttl=STRING                 Time-to-live in time.Duration format
@@ -240,61 +243,11 @@ Commands:
 Run "helm-dryer <command> --help" for more information on a command.
 ```
 
+For the full CLI reference of each command, see [docs/cli.md](docs/cli.md).
+
 ### Render values
 
 An example of (pre)rendering a set of values files follows:
-
-```shell
-go run . get --help
-
-Usage: helm-dryer get [flags]
-
-Get the rendered values.
-
-Flags:
-  -h, --help                       Show context-sensitive help.
-  -a, --api-versions=,...          API versions (capabilities)
-                                   ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
-  -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
-  -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
-  -n, --release-namespace=STRING
-                                   Release namespace ($ARGOCD_APP_NAMESPACE).
-  -v, --set=KEY=VALUE,...          Injected key value pairs.
-      --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.namespace=STRING
-                                   Kubernetes namespace for ArgoCD secrets
-                                   ($ARGOCD_NAMESPACE).
-      --credentials.password=STRING
-                                   OCI registry password ($OCI_PASSWORD).
-      --credentials.registry="ghcr.io"
-                                   OCI registry URL ($OCI_REGISTRY).
-      --credentials.secret         Read repository credentials from ArgoCD
-                                   Kubernetes secrets.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
-  -L, --delim-left="{{"            Template left delimiter.
-  -R, --delim-right="}}"           Template right delimiter.
-  -I, --ignore-empty               Ignore empty/null values.
-  -m, --ignore-main-values         When present, ignore the implicit load of
-                                   main values.yaml file.
-  -i, --ignore-missing             Ignore missing values files.
-      --logging.debug              Emit debug logs in addition to info logs.
-      --logging.format="json"      Log format (json|console).
-  -o, --out=""                     Output file (default: stdout).
-  -p, --path="."                   Relative path to the chart.
-      --skip-crds                  Skip CRDs in the templated output.
-      --skip-schema-validation     Disable JSON schema validation.
-      --skip-tests                 Skip tests from templated output.
-  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
-                                   ($DRYER_TIMEOUT).
-  -t, --ttl=STRING                 Time-to-live in time.Duration format
-                                   ($CACHE_TIMEOUT).
-  -2, --two-pass                   Experimental. Perform a two-pass render.
-  -u, --update-dependencies        Always update dependencies.
-```
-
-Example:
 
 ```shell
 go run . get -f tests/values.tpl.yaml -f tests/values.stg.tpl.yaml --set clusterName=eks-cluster-platform,partition=aws,accountId=234796234 --set namePrefixWithoutDomain=eks-cluster
@@ -313,58 +266,7 @@ url: example.com/{{ .Values.foo }}  # would produce example.com/bar
 
 ### Template a Helm chart
 
-```shell
-go run . template --help
-
-Usage: helm-dryer template [flags]
-
-Render the template.
-
-Flags:
-  -h, --help                       Show context-sensitive help.
-  -a, --api-versions=,...          API versions (capabilities)
-                                   ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
-  -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
-  -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
-  -n, --release-namespace=STRING
-                                   Release namespace ($ARGOCD_APP_NAMESPACE).
-  -v, --set=KEY=VALUE,...          Injected key value pairs.
-      --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.namespace=STRING
-                                   Kubernetes namespace for ArgoCD secrets
-                                   ($ARGOCD_NAMESPACE).
-      --credentials.password=STRING
-                                   OCI registry password ($OCI_PASSWORD).
-      --credentials.registry="ghcr.io"
-                                   OCI registry URL ($OCI_REGISTRY).
-      --credentials.secret         Read repository credentials from ArgoCD
-                                   Kubernetes secrets.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
-  -L, --delim-left="{{"            Template left delimiter.
-  -R, --delim-right="}}"           Template right delimiter.
-  -I, --ignore-empty               Ignore empty/null values.
-  -m, --ignore-main-values         When present, ignore the implicit load of
-                                   main values.yaml file.
-  -i, --ignore-missing             Ignore missing values files.
-      --logging.debug              Emit debug logs in addition to info logs.
-      --logging.format="json"      Log format (json|console).
-  -o, --out=""                     Output file (default: stdout).
-  -p, --path="."                   Relative path to the chart.
-      --skip-crds                  Skip CRDs in the templated output.
-      --skip-schema-validation     Disable JSON schema validation.
-      --skip-tests                 Skip tests from templated output.
-  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
-                                   ($DRYER_TIMEOUT).
-  -t, --ttl=STRING                 Time-to-live in time.Duration format
-                                   ($CACHE_TIMEOUT).
-  -2, --two-pass                   Experimental. Perform a two-pass render.
-  -u, --update-dependencies        Always update dependencies.
-
-  -A, --application-spec=STRING    Path to the Application spec file.
-  -H, --disable-hooks              Disable Helm hooks.
-```
+The `template` command additionally supports `-A` (application spec) and `-H` (disable hooks) flags.
 
 For example:
 
@@ -378,66 +280,15 @@ go run . template -f tests/values.yaml -f tests/values.tpl.yaml -f tests/values.
 
 This is essentially a wrapper on `template`, but assumes some information is passed as environment variables.
 
-```shell
-go run . render --help
-
-Usage: helm-dryer render [flags]
-
-Render the template as a Configuration Management plugin.
-
-Flags:
-  -h, --help                       Show context-sensitive help.
-  -a, --api-versions=,...          API versions (capabilities)
-                                   ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
-  -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
-  -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
-  -n, --release-namespace=STRING
-                                   Release namespace ($ARGOCD_APP_NAMESPACE).
-  -v, --set=KEY=VALUE,...          Injected key value pairs.
-      --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.namespace=STRING
-                                   Kubernetes namespace for ArgoCD secrets
-                                   ($ARGOCD_NAMESPACE).
-      --credentials.password=STRING
-                                   OCI registry password ($OCI_PASSWORD).
-      --credentials.registry="ghcr.io"
-                                   OCI registry URL ($OCI_REGISTRY).
-      --credentials.secret         Read repository credentials from ArgoCD
-                                   Kubernetes secrets.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
-  -L, --delim-left="{{"            Template left delimiter.
-  -R, --delim-right="}}"           Template right delimiter.
-  -I, --ignore-empty               Ignore empty/null values.
-  -m, --ignore-main-values         When present, ignore the implicit load of
-                                   main values.yaml file.
-  -i, --ignore-missing             Ignore missing values files.
-      --logging.debug              Emit debug logs in addition to info logs.
-      --logging.format="json"      Log format (json|console).
-  -o, --out=""                     Output file (default: stdout).
-  -p, --path="."                   Relative path to the chart.
-      --skip-crds                  Skip CRDs in the templated output.
-      --skip-schema-validation     Disable JSON schema validation.
-      --skip-tests                 Skip tests from templated output.
-  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
-                                   ($DRYER_TIMEOUT).
-  -t, --ttl=STRING                 Time-to-live in time.Duration format
-                                   ($CACHE_TIMEOUT).
-  -2, --two-pass                   Experimental. Perform a two-pass render.
-  -u, --update-dependencies        Always update dependencies.
-
-  -A, --application-spec=STRING    Path to the Application spec file.
-  -H, --disable-hooks              Disable Helm hooks.
-```
-
 The following keys are expected under `ARGOCD_APP_PARAMETERS`:
 
 - `valueFiles`, a list of files containing values. If a file is missing, it will produce an error if
   the `ignoreMissing` flag is not enabled. No assumptions are made, and an explicit entry for
   `values.yaml` may be required when using raw values.
 - `valuesObject`, an optional map of input values.
-- `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values.
+- `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values in templated value files.
+- `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before
+  rendering. Restores Helm v3 behavior where explicit null entries are removed.
 - `ignoreMissing` [optional: `false`] a flag indicating if missing values files are ignored.
 - `skipCRDs` [optional: `false`] a flag to skip installation of CRDs by the Helm chart.
 - `skipSchemaValidation` [optional: `false`] a flag to skip JSON schema validation.
@@ -478,59 +329,6 @@ Application, directly from its spec. The file can be either in YAML or JSON form
 
 > This command assumes the input comes from `-p` rather than parameters like `-f` or `-v`.
 
-```shell
-go run . render-app --help
-
-Usage: helm-dryer render-app [flags]
-
-Render from an ArgoCD Application file.
-
-Flags:
-  -h, --help                       Show context-sensitive help.
-  -a, --api-versions=,...          API versions (capabilities)
-                                   ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
-  -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
-  -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
-  -n, --release-namespace=STRING
-                                   Release namespace ($ARGOCD_APP_NAMESPACE).
-  -v, --set=KEY=VALUE,...          Injected key value pairs.
-      --credentials.file=STRING    Path to OCI registry credentials file.
-      --credentials.namespace=STRING
-                                   Kubernetes namespace for ArgoCD secrets
-                                   ($ARGOCD_NAMESPACE).
-      --credentials.password=STRING
-                                   OCI registry password ($OCI_PASSWORD).
-      --credentials.registry="ghcr.io"
-                                   OCI registry URL ($OCI_REGISTRY).
-      --credentials.secret         Read repository credentials from ArgoCD
-                                   Kubernetes secrets.
-      --credentials.username=STRING
-                                   OCI registry username ($OCI_USERNAME).
-  -L, --delim-left="{{"            Template left delimiter.
-  -R, --delim-right="}}"           Template right delimiter.
-  -I, --ignore-empty               Ignore empty/null values.
-  -m, --ignore-main-values         When present, ignore the implicit load of
-                                   main values.yaml file.
-  -i, --ignore-missing             Ignore missing values files.
-      --logging.debug              Emit debug logs in addition to info logs.
-      --logging.format="json"      Log format (json|console).
-  -o, --out=""                     Output file (default: stdout).
-  -p, --path="."                   Relative path to the chart.
-      --skip-crds                  Skip CRDs in the templated output.
-      --skip-schema-validation     Disable JSON schema validation.
-      --skip-tests                 Skip tests from templated output.
-  -T, --timeout="90s"              Operation timeout (e.g. 30s, 2m)
-                                   ($DRYER_TIMEOUT).
-  -t, --ttl=STRING                 Time-to-live in time.Duration format
-                                   ($CACHE_TIMEOUT).
-  -2, --two-pass                   Experimental. Perform a two-pass render.
-  -u, --update-dependencies        Always update dependencies.
-
-  -A, --application-spec=STRING    Path to the Application spec file.
-  -H, --disable-hooks              Disable Helm hooks.
-```
-
 See the Application spec example from `render` for a reference about the expected fields.
 
 ### Environment variables
@@ -544,7 +342,8 @@ This plugin accepts optional settings to control its behavior. The following set
 supported:
 
 - `disableHooks` - Do not render Helm hooks.
-- `ignoreEmpty` - Do not raise an error when a specific value is empty / null.
+- `ignoreEmpty` - Do not raise an error when a specific value is empty / null in templated value files.
+- `stripNullValues` - Strip null values (`key: ~`) from chart values before rendering, restoring Helm v3 behavior.
 - `ignoreMissing` - Do not raise an error when a values file is missing.
 - `skipCRDs` - Skip the CRDs if embedded in the Helm chart.
 - `skipSchemaValidation` - Skip JSON schema validation.
@@ -560,6 +359,34 @@ supported:
 These settings can be customized per-application and override the global (CLI argument) ones.
 
 ## Known limitations and caveats
+
+### Null values in Helm v4
+
+Helm v4 changed how explicit null values (`key: ~`) are handled in the values map.
+
+In Helm v3, these entries were effectively ignored during template rendering.
+Functions like `dig` would return the default value when encountering `nil`.
+
+In Helm v4, `nil` values are preserved and passed through to template functions, which can cause errors like:
+
+```text
+invalid value; expected string
+```
+
+This happens when a template function (e.g. `regexMatch`, `printf`) receives a `nil` value instead
+of the expected type.
+
+To restore the Helm v3 behavior, enable the `--strip-null-values` flag (or `stripNullValues` in
+the ArgoCD plugin settings). This recursively removes all `nil` entries from the chart values before
+passing them to Helm's template engine.
+
+```yaml
+# ArgoCD Application example
+parameters:
+  - name: settings
+    map:
+      stripNullValues: "true"
+```
 
 ### Explicit values.yaml declaration
 

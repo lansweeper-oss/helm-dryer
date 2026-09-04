@@ -14,8 +14,8 @@ import (
 	helmClient "github.com/lansweeper-oss/helm-dryer/internal/helm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/chart"
-	ociRegistry "helm.sh/helm/v3/pkg/registry"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
+	ociRegistry "helm.sh/helm/v4/pkg/registry"
 )
 
 func TestFindBestVersionMatch(t *testing.T) {

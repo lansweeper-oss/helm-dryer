@@ -17,7 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
-	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v4/pkg/chart/common"
+	chartutil "helm.sh/helm/v4/pkg/chart/common/util"
 )
 
 const testFolder = "testdata/"
@@ -98,6 +99,7 @@ func setupTest(t *testing.T, testFiles []string) *dryer.Input {
 	}
 
 	setup.Settings.UpdateDependencies = false
+	setup.Settings.StripNullValues = true
 	setup.Settings.Logging.Debug = true
 	setup.Settings.Logging.Format = "text"
 
@@ -329,7 +331,7 @@ func TestNullRemovesKeys(t *testing.T) {
 	merged, err := utils.ParseYAMLFile(test.Settings.Out)
 	require.NoError(t, err, "The output values should be a valid YAML")
 
-	options := chartutil.ReleaseOptions{
+	options := common.ReleaseOptions{
 		Name:      test.Data.ReleaseName,
 		Namespace: test.Data.ReleaseNamespace,
 		Revision:  1,
@@ -348,21 +350,21 @@ func TestNullRemovesKeys(t *testing.T) {
 	require.NoError(t, err, "Failed to process chart values")
 
 	chart.Values = map[string]any{}
-	result, err := chartutil.ToRenderValues(chart, merged, options, chartutil.DefaultCapabilities)
+	result, err := chartutil.ToRenderValues(chart, merged, options, common.DefaultCapabilities)
 	require.NoError(t, err, "Error obtaining final values")
 
-	finalValues := result["Values"].(chartutil.Values)["monitoring"].(map[string]any)
+	finalValues := result["Values"].(common.Values)["monitoring"].(map[string]any)
 	_, exists := finalValues["service"].(map[string]any)["name"]
 	assert.True(t, exists, "The 'service.name' key is passed as null when we omit chart values")
 
 	// restore chart.Values and try again; we control this behavior with Settings.PreserveNullKeys.
 	chart.Values = chartValues
-	result, err = chartutil.ToRenderValues(chart, merged, options, chartutil.DefaultCapabilities)
+	result, err = chartutil.ToRenderValues(chart, merged, options, common.DefaultCapabilities)
 	require.NoError(t, err, "Error obtaining final values")
 
-	finalValues = result["Values"].(chartutil.Values)["monitoring"].(map[string]any)
-	_, exists = finalValues["service"].(map[string]any)["name"]
-	assert.False(t, exists, "The 'service.name' key should not exist when we pass chart values")
+	finalValues = result["Values"].(common.Values)["monitoring"].(map[string]any)
+	nameVal := finalValues["service"].(map[string]any)["name"]
+	assert.Nil(t, nameVal, "The 'service.name' key should be nil when we pass chart values")
 }
 
 // TestIgnoreMainValues validates the edge case of nullified values and umbrella charts, where
@@ -376,6 +378,10 @@ func TestNullRemovesKeys(t *testing.T) {
 //
 // and foo is not a subchart (otherwise, subchart's values apply), we might expect the key to be
 // removed as in https://helm.sh/docs/chart_template_guide/values_files/#deleting-a-default-key.
+//
+// NOTE: Helm v4 changed nil value coalescing — nils are preserved in both modes, so
+// IgnoreMainValues no longer causes template failures for nil values. Charts should
+// use `| default ""` to handle nil values defensively.
 func TestIgnoreMainValues(t *testing.T) {
 	t.Parallel()
 
@@ -390,7 +396,7 @@ func TestIgnoreMainValues(t *testing.T) {
 	test.Settings.IgnoreMainValues = true
 	err = test.TemplateChart(context.Background())
 
-	require.Error(t, err, "TemplateChart should fail now")
+	require.NoError(t, err, "TemplateChart should not return an error with IgnoreMainValues in Helm v4")
 }
 
 func TestUsingFolderAsOutput(t *testing.T) {
