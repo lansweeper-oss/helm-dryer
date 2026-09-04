@@ -359,6 +359,34 @@ These settings can be customized per-application and override the global (CLI ar
 
 ## Known limitations and caveats
 
+### Null values in Helm v4
+
+Helm v4 changed how explicit null values (`key: ~`) are handled in the values map.
+
+In Helm v3, these entries were effectively ignored during template rendering.
+Functions like `dig` would return the default value when encountering `nil`.
+
+In Helm v4, `nil` values are preserved and passed through to template functions, which can cause errors like:
+
+```
+invalid value; expected string
+```
+
+This happens when a template function (e.g. `regexMatch`, `printf`) receives a `nil` value instead
+of the expected type.
+
+To restore the Helm v3 behavior, enable the `--strip-null-values` flag (or `stripNullValues` in
+the ArgoCD plugin settings). This recursively removes all `nil` entries from the chart values before
+passing them to Helm's template engine.
+
+```yaml
+# ArgoCD Application example
+parameters:
+  - name: settings
+    map:
+      stripNullValues: "true"
+```
+
 ### Explicit values.yaml declaration
 
 Unlike Helm, which automatically loads `values.yaml` when present, this plugin requires explicit
