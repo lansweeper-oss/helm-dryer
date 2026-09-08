@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/lansweeper-oss/helm-dryer/internal/dryer"
+	dryerr "github.com/lansweeper-oss/helm-dryer/internal/errors"
 	client "github.com/lansweeper-oss/helm-dryer/internal/helm"
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/stretchr/testify/assert"
@@ -788,6 +789,78 @@ func TestSetOverridesFiles(t *testing.T) {
 		controllerValues["logLevel"],
 		"Set should override the file values",
 	)
+}
+
+// writeMarkerValues writes env/prod.yaml under base, holding a marker to tell the file apart.
+func writeMarkerValues(t *testing.T, base, marker string) {
+	t.Helper()
+
+	err := os.MkdirAll(filepath.Join(base, "env"), utils.ReadWriteDir)
+	require.NoError(t, err, "error creating the env folder")
+
+	err = os.WriteFile(
+		filepath.Join(base, "env", "prod.yaml"),
+		[]byte("absoluteMarker: "+marker+"\n"),
+		utils.ReadWrite,
+	)
+	require.NoError(t, err, "error writing the marker values file")
+}
+
+// setupRepoTest lays the chart out in a repository-like folder, with the chart in a subfolder,
+// a values file at the root of the repository and a decoy with the same relative path under the
+// chart folder, so we can tell from which base an absolute values file was resolved.
+func setupRepoTest(t *testing.T, files []string) *dryer.Input {
+	t.Helper()
+
+	test := setupTest(t, files)
+
+	repoRoot := t.TempDir()
+	chartPath := filepath.Join(repoRoot, "charts", "app")
+
+	err := os.MkdirAll(chartPath, utils.ReadWriteDir)
+	require.NoError(t, err, "error creating the chart folder")
+
+	err = os.CopyFS(chartPath, os.DirFS(testFolder))
+	require.NoError(t, err, "error copying test data")
+
+	writeMarkerValues(t, repoRoot, "from-repo-root")
+	writeMarkerValues(t, chartPath, "from-chart-path")
+
+	test.Settings.Path = chartPath
+	test.Settings.RepoRoot = repoRoot
+
+	return test
+}
+
+func TestAbsoluteValuesFileResolvesFromRepoRoot(t *testing.T) {
+	t.Parallel()
+
+	test := setupRepoTest(t, []string{"values.yaml", "/env/prod.yaml"})
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err, "The output values should be a valid YAML")
+
+	assert.Equal(
+		t,
+		"from-repo-root",
+		out["absoluteMarker"],
+		"An absolute values file should be resolved from the repository root, not from the chart path",
+	)
+}
+
+func TestAbsoluteValuesFileOutsideRepoRoot(t *testing.T) {
+	t.Parallel()
+
+	test := setupRepoTest(t, []string{"values.yaml", "/../env/prod.yaml"})
+
+	// A path escaping the repository root is a misconfiguration rather than a missing file.
+	test.Settings.IgnoreMissing = true
+
+	err := test.TemplateValues(context.Background())
+	require.ErrorIs(t, err, dryerr.ErrOutsideRepoRoot, "Values files outside the repository root should be rejected")
 }
 
 func TestIncorrectOutputFallback(t *testing.T) {

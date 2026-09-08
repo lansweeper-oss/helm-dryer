@@ -17,7 +17,8 @@ Flags:
   -h, --help                       Show context-sensitive help.
   -a, --api-versions=,...          API versions (capabilities)
                                    ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
+  -f, --files=FILES                Values files, relative to Path (or to
+                                   --repo-root if absolute).
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -46,6 +47,8 @@ Flags:
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
+      --repo-root=STRING           Repository root, base for absolute values
+                                   files.
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
@@ -92,7 +95,8 @@ Flags:
   -h, --help                       Show context-sensitive help.
   -a, --api-versions=,...          API versions (capabilities)
                                    ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
+  -f, --files=FILES                Values files, relative to Path (or to
+                                   --repo-root if absolute).
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -121,6 +125,8 @@ Flags:
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
+      --repo-root=STRING           Repository root, base for absolute values
+                                   files.
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
@@ -147,7 +153,8 @@ Flags:
   -h, --help                       Show context-sensitive help.
   -a, --api-versions=,...          API versions (capabilities)
                                    ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
+  -f, --files=FILES                Values files, relative to Path (or to
+                                   --repo-root if absolute).
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -176,6 +183,8 @@ Flags:
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
+      --repo-root=STRING           Repository root, base for absolute values
+                                   files.
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
@@ -205,7 +214,8 @@ Flags:
   -h, --help                       Show context-sensitive help.
   -a, --api-versions=,...          API versions (capabilities)
                                    ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
+  -f, --files=FILES                Values files, relative to Path (or to
+                                   --repo-root if absolute).
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -234,6 +244,8 @@ Flags:
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
+      --repo-root=STRING           Repository root, base for absolute values
+                                   files.
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.
@@ -263,7 +275,8 @@ Flags:
   -h, --help                       Show context-sensitive help.
   -a, --api-versions=,...          API versions (capabilities)
                                    ($KUBE_API_VERSIONS).
-  -f, --files=FILES                Values files relative to Path.
+  -f, --files=FILES                Values files, relative to Path (or to
+                                   --repo-root if absolute).
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -292,6 +305,8 @@ Flags:
       --logging.format="json"      Log format (json|console).
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
+      --repo-root=STRING           Repository root, base for absolute values
+                                   files.
       --skip-crds                  Skip CRDs in the templated output.
       --skip-schema-validation     Disable JSON schema validation.
       --skip-tests                 Skip tests from templated output.

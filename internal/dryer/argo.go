@@ -11,6 +11,10 @@ import (
 )
 
 func (in *Input) ReadEnvironment() error {
+	// Absolute values files are resolved from the repository root, which ArgoCD does not pass
+	// explicitly, so it has to be derived from the environment.
+	in.resolveRepoRootFromEnv()
+
 	// Run templateChart from CMP parameters as come from ARGOCD_APP_PARAMETERS.
 	params := utils.GetEnv(argo.Parameters, "")
 

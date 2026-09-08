@@ -81,7 +81,7 @@ linters:
           sizeThreshold: 32
 
     tagalign:
-      align: false
+      align: true
       sort: true
 
     revive:

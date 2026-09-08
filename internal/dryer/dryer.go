@@ -54,6 +54,10 @@ func (in *Input) RenderFromApp(ctx context.Context) error {
 
 	slog.Debug("Successfully read application spec", "app", app)
 
+	// resolve the repository root before Path becomes the Application folder: the path set in the
+	// CLI hosts the Application source path, hence it is the repository root
+	in.Settings.RepoRoot = in.repoRoot()
+
 	// application path is relative to the one set in the CLI
 	in.Settings.Path = filepath.Join(in.Settings.Path, app.Spec.Source.Path)
 
@@ -181,19 +185,23 @@ func (in *Input) processValuesFiles(
 	templatedData := make([]map[string]any, 0, len(in.Data.Files)+1)
 
 	for _, file := range in.Data.Files {
-		fileWithPath := filepath.Join(in.Settings.Path, file)
+		fileWithPath, err := in.resolveValuesFile(file)
+		if err != nil {
+			// a misconfigured path is an error even when missing files are ignored
+			return nil, err
+		}
 
-		_, err := os.Stat(fileWithPath)
+		_, err = os.Stat(fileWithPath)
 		if errors.Is(err, os.ErrNotExist) {
 			if in.Settings.IgnoreMissing {
-				slog.Debug("Ignoring missing file: " + file)
+				slog.Debug("Ignoring missing file", "file", file, "resolved", fileWithPath)
 
 				continue
 			}
 
-			return nil, fmt.Errorf("%w: %s", os.ErrNotExist, file)
+			return nil, fmt.Errorf("%w: %s (resolved to %s)", os.ErrNotExist, file, fileWithPath)
 		} else if err != nil {
-			return nil, fmt.Errorf("failed to stat values file %s: %w", file, err)
+			return nil, fmt.Errorf("failed to stat values file %s: %w", fileWithPath, err)
 		}
 
 		slog.Debug("Reading values file: " + fileWithPath)
