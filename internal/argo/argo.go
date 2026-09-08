@@ -4,6 +4,9 @@ package argo
 const (
 	// Parameters is the name of the environment variable hosting the ArgoCD Application.
 	Parameters = "ARGOCD_APP_PARAMETERS"
+	// SourcePath is the name of the environment variable hosting the Application source path,
+	// which ArgoCD sets relative to the root of the repository.
+	SourcePath = "ARGOCD_APP_SOURCE_PATH"
 )
 
 // App represents the ArgoCD Application CRD.

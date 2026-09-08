@@ -174,6 +174,54 @@ In order to check the usage of the tool, do:
 
 For the full CLI reference of each command, see [docs/cli.md](docs/cli.md).
 
+### Values files paths
+
+Values files paths are resolved as ArgoCD does for `spec.source.helm.valueFiles`:
+
+- A **relative** path is resolved from the chart path, that is, the `-p` value or the Application
+  folder when running as a CMP plugin.
+- An **absolute** path (starting with `/`) is resolved from the **root of the repository**, and it
+  may not escape it.
+
+The repository root is obtained differently depending on the command:
+
+- `render` derives it from the chart path and `ARGOCD_APP_SOURCE_PATH`, both provided by ArgoCD.
+- `render-app` uses the `-p` value, since the Application `spec.source.path` is relative to it.
+- `get` and `template` use the `--repo-root` value, which defaults to the chart path.
+
+For example, given a repository like:
+
+```text
+env/
+   '--- prod.yaml
+charts/
+   '--- app/
+          |--- Chart.yaml
+          '--- values.yaml
+```
+
+an Application with `spec.source.path: charts/app` can consume values from the root of the
+repository:
+
+```yaml
+        - name: valueFiles
+          array:
+            - values.yaml     # charts/app/values.yaml
+            - /env/prod.yaml  # env/prod.yaml
+```
+
+and the very same set of values can be reproduced locally with:
+
+```shell
+go run . get -f values.yaml -f /env/prod.yaml -p charts/app --repo-root .
+```
+
+> When the repository root cannot be determined, a warning is logged and the chart path is used
+> instead, which makes absolute paths behave as relative ones.
+>
+> A values file resolving outside the repository root is a configuration error, so it is reported
+> even when the `ignoreMissing` flag is enabled.
+
 ### Render values
 
 An example of (pre)rendering a set of values files follows:
@@ -213,7 +261,9 @@ The following keys are expected under `ARGOCD_APP_PARAMETERS`:
 
 - `valueFiles`, a list of files containing values. If a file is missing, it will produce an error if
   the `ignoreMissing` flag is not enabled. No assumptions are made, and an explicit entry for
-  `values.yaml` may be required when using raw values.
+  `values.yaml` may be required when using raw values. Entries are resolved from the Application
+  folder, or from the root of the repository when the path is absolute
+  (see [Values files paths](#values-files-paths)).
 - `valuesObject`, an optional map of input values.
 - `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values in templated value files.
 - `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before

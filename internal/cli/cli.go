@@ -19,7 +19,7 @@ type Credentials struct {
 // Data holds all the possible values feeding the application.
 type Data struct {
 	APIVersions      []string          `default:""                            env:"KUBE_API_VERSIONS"   help:"API versions (capabilities)." short:"a"`
-	Files            []string          `help:"Values files relative to Path." short:"f"                 type:"string"`
+	Files            []string          `help:"Values files, relative to Path (or to --repo-root if absolute)."        short:"f"             type:"string"`
 	KubeVersion      string            `default:""                            env:"KUBE_VERSION"        help:"Kubernetes version."          short:"k"`
 	ReleaseName      string            `env:"ARGOCD_APP_NAME"                 help:"Release name."      short:"r"`
 	ReleaseNamespace string            `env:"ARGOCD_APP_NAMESPACE"            help:"Release namespace." short:"n"`
@@ -43,6 +43,7 @@ type Settings struct {
 	Logging              Logging     `embed:""                                                                help:"Logging configuration."                prefix:"logging."`
 	Out                  string      `default:""                                                              help:"Output file (default: stdout)."        short:"o"`
 	Path                 string      `default:"."                                                             help:"Relative path to the chart."           short:"p"                                type:"existingdir"`
+	RepoRoot             string      `help:"Repository root, base for absolute values files."                 type:"existingdir"`
 	SkipCRDs             bool        `help:"Skip CRDs in the templated output."                               name:"skip-crds"`
 	SkipSchemaValidation bool        `help:"Disable JSON schema validation."`
 	SkipTests            bool        `help:"Skip tests from templated output."`

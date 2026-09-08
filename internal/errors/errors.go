@@ -7,6 +7,8 @@ var (
 	ErrEnvNotSet                = errors.New("environment variable not set")
 	ErrInvalidKubeVersionFormat = errors.New("invalid KubeVersion format: expected Major.Minor(.ANY)")
 	ErrNotFound                 = errors.New("not found")
+	ErrOutsideRepoRoot          = errors.New("path resolves outside the repository root")
+	ErrSourcePathMismatch       = errors.New("chart path does not end with the application source path")
 	ErrUnexpectedReleaseType    = errors.New("unexpected release type")
 	ErrUnexpectedType           = errors.New("expected a map for key")
 )
