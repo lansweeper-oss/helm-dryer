@@ -12,5 +12,3 @@ coverage.out
 !.mdlrc
 !.mdl_style.rb
 !.pre-commit-config.yaml
-.codex/**
-.mdkb/**
