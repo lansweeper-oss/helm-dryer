@@ -863,6 +863,81 @@ func TestAbsoluteValuesFileOutsideRepoRoot(t *testing.T) {
 	require.ErrorIs(t, err, dryerr.ErrOutsideRepoRoot, "Values files outside the repository root should be rejected")
 }
 
+func TestInitialValues(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFiles)
+
+	// Write a initial values file with flat key-value pairs
+	voFile := filepath.Join(t.TempDir(), "values-object.yaml")
+	err := os.WriteFile(voFile, []byte("foo-bar.logLevel: debug\nfoo-bar.serviceMonitor.enabled: \"false\"\n"), 0o644)
+	require.NoError(t, err, "error writing initial values file")
+
+	test.Data.InitialValues = []string{voFile}
+
+	err = test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err, "The output values should be a valid YAML")
+
+	controllerValues, ok := out["foo-bar"].(map[string]any)
+	require.True(t, ok, "Error processing dot notation values from initial values file")
+	assert.Equal(t, "false", controllerValues["serviceMonitor"].(map[string]any)["enabled"])
+	assert.Equal(t, "debug", controllerValues["logLevel"])
+}
+
+func TestInitialValuesMultiple(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFiles)
+
+	tmpDir := t.TempDir()
+	file1 := filepath.Join(tmpDir, "vo1.yaml")
+	file2 := filepath.Join(tmpDir, "vo2.yaml")
+
+	err := os.WriteFile(file1, []byte("foo-bar.logLevel: info\n"), 0o644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(file2, []byte("foo-bar.logLevel: debug\nfoo-bar.serviceMonitor.enabled: \"false\"\n"), 0o644)
+	require.NoError(t, err)
+
+	test.Data.InitialValues = []string{file1, file2}
+
+	err = test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err)
+
+	controllerValues, ok := out["foo-bar"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "false", controllerValues["serviceMonitor"].(map[string]any)["enabled"])
+	assert.Equal(t, "debug", controllerValues["logLevel"], "Last file should win over earlier files")
+}
+
+func TestInitialValuesCLITakesPrecedence(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFiles)
+
+	voFile := filepath.Join(t.TempDir(), "values-object.yaml")
+	err := os.WriteFile(voFile, []byte("domain: from-file\n"), 0o644)
+	require.NoError(t, err, "error writing initial values file")
+
+	test.Data.InitialValues = []string{voFile}
+	// CLI --set should win over file
+	test.Data.Set["domain"] = "from-cli"
+
+	err = test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err, "The output values should be a valid YAML")
+
+	assert.Equal(t, "from-cli", out["domain"], "CLI --set should take precedence over initial values file")
+}
+
 func TestIncorrectOutputFallback(t *testing.T) {
 	t.Parallel()
 

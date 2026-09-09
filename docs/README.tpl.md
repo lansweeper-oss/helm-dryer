@@ -109,12 +109,14 @@ Under the hood, the plugin is fed from (and merged in that order, with later tak
 - Helm dependencies (if any) merged one after the other (in an umbrella chart-like tree).
   - For a dependency named `foo`, that means the values will hang from a parent key `foo`.
 - ArgoCD values files (read one by one).
-- ArgoCD values object (passed as key-value pairs).
+- Initial values (`--initial-values`, merged left to right, last file wins).
+- ArgoCD values object (passed as key-value pairs via `--set`/`-v`).
 
 ```mermaid
 graph RL
 B[values Files] -->|overrides| A[Chart dependency values]
-C[values Object] -->|overrides| B
+D[Initial Values] -->|overrides| B
+C[values Object] -->|overrides| D
 ```
 
 ## Usage
@@ -228,6 +230,13 @@ An example of (pre)rendering a set of values files follows:
 
 ```shell
 go run . get -f tests/values.tpl.yaml -f tests/values.stg.tpl.yaml --set clusterName=eks-cluster-platform,partition=aws,accountId=234796234 --set namePrefixWithoutDomain=eks-cluster
+```
+
+Alternatively, the values object can be loaded from YAML files with `--initial-values`.
+Multiple files can be comma-separated; later files override earlier ones, and `--set` always wins:
+
+```shell
+go run . get -f tests/values.tpl.yaml -V common.yaml,env/staging.yaml --set domain=override
 ```
 
 > Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.

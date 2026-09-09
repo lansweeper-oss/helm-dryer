@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -135,6 +136,10 @@ func (in *Input) TemplateValues(ctx context.Context) error {
 // be too noisy and not useful for an end user. We use those dependency values though to feed
 // the templating engine, so that the values files can use the dependencies as well.
 func (in *Input) compoundValues(initialValues map[string]any) (map[string]any, error) {
+	if err := in.loadInitialValues(); err != nil {
+		return nil, err
+	}
+
 	cliVals, err := values.DotNotationToMap(in.Data.Set)
 	if err != nil {
 		return nil, fmt.Errorf("error converting CLI set values to map: %w", err)
@@ -223,6 +228,43 @@ func (in *Input) processValuesFiles(
 	}
 
 	return merged, nil
+}
+
+// loadInitialValues reads YAML files containing flat key-value pairs and merges them
+// into Data.Set. Precedence: --set wins, then last file wins over earlier files. The file
+// list is cleared after loading to prevent re-loading on recursive calls (two-pass).
+func (in *Input) loadInitialValues() error {
+	if len(in.Data.InitialValues) == 0 {
+		return nil
+	}
+
+	cliSet := in.Data.Set
+	merged := make(map[string]string)
+
+	for _, file := range in.Data.InitialValues {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to read initial values file %s: %w", file, err)
+		}
+
+		var fileVals map[string]string
+
+		err = yaml.Unmarshal(content, &fileVals)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal initial values file %s: %w", file, err)
+		}
+
+		slog.Debug("Loaded initial values file", "file", file, "keys", len(fileVals))
+
+		maps.Copy(merged, fileVals)
+	}
+
+	maps.Copy(merged, cliSet)
+
+	in.Data.Set = merged
+	in.Data.InitialValues = nil
+
+	return nil
 }
 
 // runtimeValues collects the runtime values (mainly .Release and .Capabilities).
