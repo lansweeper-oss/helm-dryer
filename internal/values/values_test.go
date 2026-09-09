@@ -391,6 +391,88 @@ func TestFromCli(t *testing.T) {
 	}
 }
 
+func TestResolvedValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected map[string]any
+	}{
+		{
+			name:     "Nil values stripped",
+			input:    map[string]any{"a": "keep", "b": nil},
+			expected: map[string]any{"a": "keep"},
+		},
+		{
+			name:     "Empty strings stripped",
+			input:    map[string]any{"a": "keep", "b": ""},
+			expected: map[string]any{"a": "keep"},
+		},
+		{
+			name: "Nested nil and empty stripped",
+			input: map[string]any{
+				"top": map[string]any{
+					"keep": "yes",
+					"drop": nil,
+					"gone": "",
+				},
+			},
+			expected: map[string]any{
+				"top": map[string]any{
+					"keep": "yes",
+				},
+			},
+		},
+		{
+			name: "Empty nested map removed",
+			input: map[string]any{
+				"a": map[string]any{
+					"b": nil,
+				},
+			},
+			expected: map[string]any{},
+		},
+		{
+			name: "Non-string non-nil values kept",
+			input: map[string]any{
+				"num":  42,
+				"bool": true,
+				"list": []any{"x"},
+			},
+			expected: map[string]any{
+				"num":  42,
+				"bool": true,
+				"list": []any{"x"},
+			},
+		},
+		{
+			name:     "Empty input",
+			input:    map[string]any{},
+			expected: map[string]any{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := values.ResolvedValues(test.input)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestResolvedValuesDoesNotMutateInput(t *testing.T) {
+	t.Parallel()
+
+	input := map[string]any{"a": "keep", "b": nil, "c": ""}
+
+	_ = values.ResolvedValues(input)
+
+	assert.Len(t, input, 3, "Original map should not be modified")
+}
+
 func TestDotNotationToMapTypeConflict(t *testing.T) {
 	t.Parallel()
 

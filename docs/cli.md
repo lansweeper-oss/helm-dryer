@@ -19,6 +19,8 @@ Flags:
                                    ($KUBE_API_VERSIONS).
   -f, --files=FILES                Values files, relative to Path (or to
                                    --repo-root if absolute).
+      --initial-values=INITIAL-VALUES
+                                   YAML files merged into the values object.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -45,6 +47,8 @@ Flags:
   -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
       --repo-root=STRING           Repository root, base for absolute values
@@ -97,6 +101,8 @@ Flags:
                                    ($KUBE_API_VERSIONS).
   -f, --files=FILES                Values files, relative to Path (or to
                                    --repo-root if absolute).
+      --initial-values=INITIAL-VALUES
+                                   YAML files merged into the values object.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -123,6 +129,8 @@ Flags:
   -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
       --repo-root=STRING           Repository root, base for absolute values
@@ -155,6 +163,8 @@ Flags:
                                    ($KUBE_API_VERSIONS).
   -f, --files=FILES                Values files, relative to Path (or to
                                    --repo-root if absolute).
+      --initial-values=INITIAL-VALUES
+                                   YAML files merged into the values object.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -181,6 +191,8 @@ Flags:
   -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
       --repo-root=STRING           Repository root, base for absolute values
@@ -216,6 +228,8 @@ Flags:
                                    ($KUBE_API_VERSIONS).
   -f, --files=FILES                Values files, relative to Path (or to
                                    --repo-root if absolute).
+      --initial-values=INITIAL-VALUES
+                                   YAML files merged into the values object.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -242,6 +256,8 @@ Flags:
   -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
       --repo-root=STRING           Repository root, base for absolute values
@@ -277,6 +293,8 @@ Flags:
                                    ($KUBE_API_VERSIONS).
   -f, --files=FILES                Values files, relative to Path (or to
                                    --repo-root if absolute).
+      --initial-values=INITIAL-VALUES
+                                   YAML files merged into the values object.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -303,6 +321,8 @@ Flags:
   -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
       --repo-root=STRING           Repository root, base for absolute values

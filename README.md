@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-73%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-76%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -111,12 +111,14 @@ Under the hood, the plugin is fed from (and merged in that order, with later tak
 - Helm dependencies (if any) merged one after the other (in an umbrella chart-like tree).
   - For a dependency named `foo`, that means the values will hang from a parent key `foo`.
 - ArgoCD values files (read one by one).
-- ArgoCD values object (passed as key-value pairs).
+- Initial values (`--initial-values`, merged left to right, last file wins).
+- ArgoCD values object (passed as key-value pairs via `--set`/`-v`).
 
 ```mermaid
 graph RL
 B[values Files] -->|overrides| A[Chart dependency values]
-C[values Object] -->|overrides| B
+D[Initial Values] -->|overrides| B
+C[values Object] -->|overrides| D
 ```
 
 ## Usage
@@ -185,6 +187,8 @@ Flags:
                                    ($KUBE_API_VERSIONS).
   -f, --files=FILES                Values files, relative to Path (or to
                                    --repo-root if absolute).
+      --initial-values=INITIAL-VALUES
+                                   YAML files merged into the values object.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -211,6 +215,8 @@ Flags:
   -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
       --repo-root=STRING           Repository root, base for absolute values
@@ -304,6 +310,13 @@ An example of (pre)rendering a set of values files follows:
 go run . get -f tests/values.tpl.yaml -f tests/values.stg.tpl.yaml --set clusterName=eks-cluster-platform,partition=aws,accountId=234796234 --set namePrefixWithoutDomain=eks-cluster
 ```
 
+Alternatively, the values object can be loaded from YAML files with `--initial-values`.
+Later files override earlier ones, and `--set` always wins:
+
+```shell
+go run . get -f tests/values.tpl.yaml --initial-values common.yaml --initial-values env/staging.yaml --set domain=override
+```
+
 > Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.
 > Additionally, `fromYaml` and `toYaml` functions are available.
 >
@@ -338,6 +351,8 @@ The following keys are expected under `ARGOCD_APP_PARAMETERS`:
   `values.yaml` may be required when using raw values. Entries are resolved from the Application
   folder, or from the root of the repository when the path is absolute
   (see [Values files paths](#values-files-paths)).
+- `initialValues`, an optional list of YAML files merged into the values object.
+  Later files override earlier ones, and `valuesObject` entries always win.
 - `valuesObject`, an optional map of input values.
 - `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values in templated value files.
 - `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before
@@ -346,6 +361,7 @@ The following keys are expected under `ARGOCD_APP_PARAMETERS`:
 - `skipCRDs` [optional: `false`] a flag to skip installation of CRDs by the Helm chart.
 - `skipSchemaValidation` [optional: `false`] a flag to skip JSON schema validation.
 - `skipTests` [optional: `false`] a flag to skip Helm test resources.
+- `onTheFly` [optional: `false`] **Experimental**, merge resolved values across files on the fly (see below).
 - `twoPass` [optional: `false`] **Experimental**, allow template values files over themselves.
 
 For example:
@@ -362,6 +378,9 @@ spec:
           array:
             - values.tpl.yaml
             - values.stg.yaml
+        - name: initialValues
+          array:
+            - common-values.yaml
         - name: valuesObject
           map:
             image.tag: v1.2.3
@@ -407,6 +426,7 @@ supported:
   `ARGOCD_APP_NAMESPACE` or Application's `spec.destination.namespace` (in that order of precedence)
   is used.
 - `ttl` - Per-app control of the chart dependency archives TTL (Go `time.Duration` format, e.g. `"5m"`, `"1h"`).
+- `onTheFly` - Experimental (see below) feature to merge resolved values across files on the fly.
 - `twoPass` - Experimental (see below) feature to do a 2-pass render of the values.
 
 These settings can be customized per-application and override the global (CLI argument) ones.
@@ -563,6 +583,74 @@ When running `dryer` container with a `readOnlyRootFilesystem: true` security co
 [...]
 ```
 
+### On-the-fly values merging
+
+#### Why
+
+In the default rendering mode, every values file is templated against the same `.Values` context
+(chart dependencies + `valuesObject`).
+If one file defines a value that another file references via `.Values`, the reference will be empty.
+The files are **independent of each other during templating**.
+
+On-the-fly mode solves this by feeding resolved values from one file into the next, so cross-file
+`.Values` references work in a single pass.
+
+#### How it works
+
+When `onTheFly` is enabled, the plugin processes values files in **reverse order** and builds an
+accumulator:
+
+1. The accumulator starts with the initial values (chart dependencies + `valuesObject`).
+2. The **last** file (highest priority) is templated first using the accumulator as `.Values`.
+3. Its resolved values (non-nil, non-empty) are merged into the accumulator, but existing
+   accumulator entries always win.
+4. The next file is templated using the enriched accumulator, and so on.
+5. After all files are processed, the results are merged in the original file order so that later
+   files still override earlier ones.
+
+```mermaid
+graph LR
+  A[initialValues] --> B["File C (last)"]
+  B --> |resolved values| C[accumulator]
+  C --> D["File B"]
+  D --> |resolved values| E[accumulator]
+  E --> F["File A (first)"]
+  F --> G[Final merge in original order]
+```
+
+Priority chain: `initialValues` > last file > ... > first file, matching standard Helm semantics.
+
+#### Example
+
+`values.base.yaml` - plain YAML, no templates:
+
+```yaml
+environment: staging
+region: eu-west-1
+```
+
+`values.app.tpl.yaml` - references base values:
+
+```yaml
+app:
+  endpoint: https://api.{{ .Values.region }}.example.com
+  env: {{ .Values.environment }}
+```
+
+With file order `[values.app.tpl.yaml, values.base.yaml]` and `onTheFly: "true"`, the base file is
+processed first (reverse order).
+Its resolved `region` and `environment` values feed into the tpl file, producing the correct
+endpoint without needing two-pass.
+
+#### Caveats
+
+This is an **experimental** feature. `nil` values and empty strings from unresolved template
+expressions are stripped from the accumulator to prevent feeding placeholders into other files.
+Intentional `key: ~` deletions are preserved in the final merge output.
+
+When `stripNullValues` is enabled, it operates on the final merged result, not on the per-file
+accumulator.
+
 ### Two-pass rendering
 
 #### Why
@@ -706,6 +794,9 @@ repoServer:
           - name: settings
             collectionType: map
             title: Plugin Settings
+          - name: initialValues
+            collectionType: array
+            title: Initial Values Files
           - name: valueFiles
             collectionType: array
             title: Values Files

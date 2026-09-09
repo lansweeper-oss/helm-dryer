@@ -1,0 +1,4 @@
+missing:
+  value: {{ .Values.doesNotExist }}
+resolved:
+  value: present

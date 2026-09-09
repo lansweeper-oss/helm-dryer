@@ -39,6 +39,10 @@ func (in *Input) ReadParameters(parameters []argo.Parameter) {
 	for i := range parameters {
 		param := &parameters[i]
 		switch param.Name {
+		case "initialValues":
+			slog.Debug("Reading initialValues")
+
+			in.Data.InitialValues = param.Array
 		case "settings":
 			slog.Debug("Reading settings")
 
@@ -55,53 +59,50 @@ func (in *Input) ReadParameters(parameters []argo.Parameter) {
 	}
 }
 
-// Read "settings" parameter map and sets the corresponding fields in the struct.
+type settingType int
+
+const (
+	boolSetting settingType = iota
+	stringSetting
+)
+
+type setting struct {
+	key        string
+	boolTarget *bool
+	strTarget  *string
+	kind       settingType
+}
+
+// readSettingsParameters reads the "settings" parameter map and sets the corresponding fields.
 func (in *Input) readSettingsParameters(param *argo.Parameter) {
-	if val, ok := param.Map["disableHooks"]; ok {
-		in.AppSettings.DisableHooks = utils.ToBoolean(val)
+	settings := []setting{
+		{key: "disableHooks", boolTarget: &in.AppSettings.DisableHooks, kind: boolSetting},
+		{key: "ignoreEmpty", boolTarget: &in.Settings.IgnoreEmpty, kind: boolSetting},
+		{key: "ignoreMissing", boolTarget: &in.Settings.IgnoreMissing, kind: boolSetting},
+		{key: "onTheFly", boolTarget: &in.Settings.OnTheFly, kind: boolSetting},
+		{key: "releaseName", strTarget: &in.Data.ReleaseName, kind: stringSetting},
+		{key: "releaseNamespace", strTarget: &in.Data.ReleaseNamespace, kind: stringSetting},
+		{key: "skipCRDs", boolTarget: &in.Settings.SkipCRDs, kind: boolSetting},
+		{key: "skipSchemaValidation", boolTarget: &in.Settings.SkipSchemaValidation, kind: boolSetting},
+		{key: "skipTests", boolTarget: &in.Settings.SkipTests, kind: boolSetting},
+		{key: "stripNullValues", boolTarget: &in.Settings.StripNullValues, kind: boolSetting},
+		{key: "ttl", strTarget: &in.Settings.TTL, kind: stringSetting},
+		{key: "twoPass", boolTarget: &in.Settings.TwoPass, kind: boolSetting},
 	}
 
-	if val, ok := param.Map["ignoreEmpty"]; ok {
-		in.Settings.IgnoreEmpty = utils.ToBoolean(val)
-	}
+	for idx := range settings {
+		val, ok := param.Map[settings[idx].key]
+		if !ok {
+			continue
+		}
 
-	if val, ok := param.Map["ignoreMissing"]; ok {
-		in.Settings.IgnoreMissing = utils.ToBoolean(val)
-	}
+		switch settings[idx].kind {
+		case boolSetting:
+			*settings[idx].boolTarget = utils.ToBoolean(val)
+		case stringSetting:
+			slog.Debug("Overriding from settings parameter", "key", settings[idx].key)
 
-	if val, ok := param.Map["releaseName"]; ok {
-		slog.Debug("Overriding release name from application parameter releaseName")
-
-		in.Data.ReleaseName = val
-	}
-
-	if val, ok := param.Map["releaseNamespace"]; ok {
-		slog.Debug("Overriding release namespace from application parameter releaseNameSpace")
-
-		in.Data.ReleaseNamespace = val
-	}
-
-	if val, ok := param.Map["stripNullValues"]; ok {
-		in.Settings.StripNullValues = utils.ToBoolean(val)
-	}
-
-	if val, ok := param.Map["skipCRDs"]; ok {
-		in.Settings.SkipCRDs = utils.ToBoolean(val)
-	}
-
-	if val, ok := param.Map["skipSchemaValidation"]; ok {
-		in.Settings.SkipSchemaValidation = utils.ToBoolean(val)
-	}
-
-	if val, ok := param.Map["skipTests"]; ok {
-		in.Settings.SkipTests = utils.ToBoolean(val)
-	}
-
-	if val, ok := param.Map["ttl"]; ok {
-		in.Settings.TTL = val
-	}
-
-	if val, ok := param.Map["twoPass"]; ok {
-		in.Settings.TwoPass = utils.ToBoolean(val)
+			*settings[idx].strTarget = val
+		}
 	}
 }

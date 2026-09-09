@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -15,11 +14,9 @@ func TestFetchSecrets(t *testing.T) {
 	t.Parallel()
 
 	repoSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "repo-helm-charts",
-			Namespace: "argocd",
-			Labels:    map[string]string{secretTypeLabel: "repository"},
-		},
+		Name:      "repo-helm-charts",
+		Namespace: "argocd",
+		Labels:    map[string]string{secretTypeLabel: "repository"},
 		Data: map[string][]byte{
 			"url":      []byte("https://charts.example.com"),
 			"username": []byte("repo-user"),
@@ -28,11 +25,9 @@ func TestFetchSecrets(t *testing.T) {
 	}
 
 	credsSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "creds-ghcr",
-			Namespace: "argocd",
-			Labels:    map[string]string{secretTypeLabel: "repo-creds"},
-		},
+		Name:      "creds-ghcr",
+		Namespace: "argocd",
+		Labels:    map[string]string{secretTypeLabel: "repo-creds"},
 		Data: map[string][]byte{
 			"url":      []byte("oci://ghcr.io/org"),
 			"username": []byte("oci-user"),
@@ -41,21 +36,17 @@ func TestFetchSecrets(t *testing.T) {
 	}
 
 	secretMissingURL := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bad-secret",
-			Namespace: "argocd",
-			Labels:    map[string]string{secretTypeLabel: "repo-creds"},
-		},
+		Name:      "bad-secret",
+		Namespace: "argocd",
+		Labels:    map[string]string{secretTypeLabel: "repo-creds"},
 		Data: map[string][]byte{
 			"username": []byte("no-url-user"),
 		},
 	}
 
 	unrelatedSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "app-secret",
-			Namespace: "argocd",
-		},
+		Name:      "app-secret",
+		Namespace: "argocd",
 		Data: map[string][]byte{
 			"url":      []byte("https://should-not-appear.com"),
 			"username": []byte("nope"),
@@ -218,11 +209,9 @@ func TestFetchSecrets_TLSCertData(t *testing.T) {
 	t.Parallel()
 
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tls-repo",
-			Namespace: "argocd",
-			Labels:    map[string]string{secretTypeLabel: "repository"},
-		},
+		Name:      "tls-repo",
+		Namespace: "argocd",
+		Labels:    map[string]string{secretTypeLabel: "repository"},
 		Data: map[string][]byte{
 			"url":               []byte("https://secure.example.com"),
 			"tlsClientCertData": []byte("cert-pem-data"),
