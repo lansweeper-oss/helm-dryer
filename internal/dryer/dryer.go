@@ -136,7 +136,8 @@ func (in *Input) TemplateValues(ctx context.Context) error {
 // be too noisy and not useful for an end user. We use those dependency values though to feed
 // the templating engine, so that the values files can use the dependencies as well.
 func (in *Input) compoundValues(initialValues map[string]any) (map[string]any, error) {
-	if err := in.loadInitialValues(); err != nil {
+	err := in.loadInitialValues()
+	if err != nil {
 		return nil, err
 	}
 
@@ -242,7 +243,7 @@ func (in *Input) loadInitialValues() error {
 	merged := make(map[string]string)
 
 	for _, file := range in.Data.InitialValues {
-		content, err := os.ReadFile(file)
+		content, err := os.ReadFile(file) //nolint:gosec // paths validated by kong existingfile type
 		if err != nil {
 			return fmt.Errorf("failed to read initial values file %s: %w", file, err)
 		}

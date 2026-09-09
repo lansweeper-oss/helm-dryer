@@ -25,8 +25,8 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --initial-values=INITIAL-VALUES
-                                   YAML files with key-value pairs
-                                   (comma-separated).
+                                   YAML files with key-value pairs for the
+                                   values object.
       --credentials.file=STRING    Path to OCI registry credentials file.
       --credentials.namespace=STRING
                                    Kubernetes namespace for ArgoCD secrets
@@ -106,8 +106,8 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --initial-values=INITIAL-VALUES
-                                   YAML files with key-value pairs
-                                   (comma-separated).
+                                   YAML files with key-value pairs for the
+                                   values object.
       --credentials.file=STRING    Path to OCI registry credentials file.
       --credentials.namespace=STRING
                                    Kubernetes namespace for ArgoCD secrets
@@ -167,8 +167,8 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --initial-values=INITIAL-VALUES
-                                   YAML files with key-value pairs
-                                   (comma-separated).
+                                   YAML files with key-value pairs for the
+                                   values object.
       --credentials.file=STRING    Path to OCI registry credentials file.
       --credentials.namespace=STRING
                                    Kubernetes namespace for ArgoCD secrets
@@ -231,8 +231,8 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --initial-values=INITIAL-VALUES
-                                   YAML files with key-value pairs
-                                   (comma-separated).
+                                   YAML files with key-value pairs for the
+                                   values object.
       --credentials.file=STRING    Path to OCI registry credentials file.
       --credentials.namespace=STRING
                                    Kubernetes namespace for ArgoCD secrets
@@ -295,8 +295,8 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --initial-values=INITIAL-VALUES
-                                   YAML files with key-value pairs
-                                   (comma-separated).
+                                   YAML files with key-value pairs for the
+                                   values object.
       --credentials.file=STRING    Path to OCI registry credentials file.
       --credentials.namespace=STRING
                                    Kubernetes namespace for ArgoCD secrets

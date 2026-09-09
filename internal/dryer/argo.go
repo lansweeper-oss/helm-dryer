@@ -39,6 +39,10 @@ func (in *Input) ReadParameters(parameters []argo.Parameter) {
 	for i := range parameters {
 		param := &parameters[i]
 		switch param.Name {
+		case "intialValues":
+			slog.Debug("Reading initialValues")
+
+			in.Data.InitialValues = param.Array
 		case "settings":
 			slog.Debug("Reading settings")
 

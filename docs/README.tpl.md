@@ -233,10 +233,10 @@ go run . get -f tests/values.tpl.yaml -f tests/values.stg.tpl.yaml --set cluster
 ```
 
 Alternatively, the values object can be loaded from YAML files with `--initial-values`.
-Multiple files can be comma-separated; later files override earlier ones, and `--set` always wins:
+Later files override earlier ones, and `--set` always wins:
 
 ```shell
-go run . get -f tests/values.tpl.yaml -V common.yaml,env/staging.yaml --set domain=override
+go run . get -f tests/values.tpl.yaml --initial-values common.yaml --initial-values env/staging.yaml --set domain=override
 ```
 
 > Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.
