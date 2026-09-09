@@ -42,6 +42,8 @@ Flags:
   -R, --delim-right="}}"           Template right delimiter.
   -I, --ignore-empty               Ignore empty/null values in templated value
                                    files.
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.
@@ -122,6 +124,8 @@ Flags:
   -R, --delim-right="}}"           Template right delimiter.
   -I, --ignore-empty               Ignore empty/null values in templated value
                                    files.
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.
@@ -182,6 +186,8 @@ Flags:
   -R, --delim-right="}}"           Template right delimiter.
   -I, --ignore-empty               Ignore empty/null values in templated value
                                    files.
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.
@@ -245,6 +251,8 @@ Flags:
   -R, --delim-right="}}"           Template right delimiter.
   -I, --ignore-empty               Ignore empty/null values in templated value
                                    files.
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.
@@ -308,6 +316,8 @@ Flags:
   -R, --delim-right="}}"           Template right delimiter.
   -I, --ignore-empty               Ignore empty/null values in templated value
                                    files.
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.

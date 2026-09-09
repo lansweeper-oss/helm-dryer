@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-74%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-72%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -210,6 +210,8 @@ Flags:
   -R, --delim-right="}}"           Template right delimiter.
   -I, --ignore-empty               Ignore empty/null values in templated value
                                    files.
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.
@@ -359,6 +361,7 @@ The following keys are expected under `ARGOCD_APP_PARAMETERS`:
 - `skipCRDs` [optional: `false`] a flag to skip installation of CRDs by the Helm chart.
 - `skipSchemaValidation` [optional: `false`] a flag to skip JSON schema validation.
 - `skipTests` [optional: `false`] a flag to skip Helm test resources.
+- `onTheFly` [optional: `false`] **Experimental**, merge resolved values across files on the fly (see below).
 - `twoPass` [optional: `false`] **Experimental**, allow template values files over themselves.
 
 For example:
@@ -423,6 +426,7 @@ supported:
   `ARGOCD_APP_NAMESPACE` or Application's `spec.destination.namespace` (in that order of precedence)
   is used.
 - `ttl` - Per-app control of the chart dependency archives TTL (Go `time.Duration` format, e.g. `"5m"`, `"1h"`).
+- `onTheFly` - Experimental (see below) feature to merge resolved values across files on the fly.
 - `twoPass` - Experimental (see below) feature to do a 2-pass render of the values.
 
 These settings can be customized per-application and override the global (CLI argument) ones.
@@ -578,6 +582,70 @@ When running `dryer` container with a `readOnlyRootFilesystem: true` security co
         name: helm-working-dir
 [...]
 ```
+
+### On-the-fly values merging
+
+#### Why
+
+In the default rendering mode, every values file is templated against the same `.Values` context
+(chart dependencies + `valuesObject`). If one file defines a value that another file references via
+`.Values`, the reference will be empty — the files are independent of each other during templating.
+
+On-the-fly mode solves this by feeding resolved values from one file into the next, so cross-file
+`.Values` references work in a single pass.
+
+#### How it works
+
+When `onTheFly` is enabled, the plugin processes values files in **reverse order** and builds an
+accumulator:
+
+1. The accumulator starts with the initial values (chart dependencies + `valuesObject`).
+2. The **last** file (highest priority) is templated first using the accumulator as `.Values`.
+3. Its resolved values (non-nil, non-empty) are merged into the accumulator, but existing
+   accumulator entries always win.
+4. The next file is templated using the enriched accumulator, and so on.
+5. After all files are processed, the results are merged in the original file order so that later
+   files still override earlier ones.
+
+```mermaid
+graph LR
+  A[initialValues] --> B["File C (last)"]
+  B --> |resolved values| C[accumulator]
+  C --> D["File B"]
+  D --> |resolved values| E[accumulator]
+  E --> F["File A (first)"]
+  F --> G[Final merge in original order]
+```
+
+Priority chain: `initialValues` > last file > … > first file, matching standard Helm semantics.
+
+#### Example
+
+`values.base.yaml` — plain YAML, no templates:
+
+```yaml
+environment: staging
+region: eu-west-1
+```
+
+`values.app.tpl.yaml` — references base values:
+
+```yaml
+app:
+  endpoint: https://api.{{ .Values.region }}.example.com
+  env: {{ .Values.environment }}
+```
+
+With file order `[values.app.tpl.yaml, values.base.yaml]` and `onTheFly: "true"`, the base file is
+processed first (reverse order). Its resolved `region` and `environment` values feed into the tpl
+file, producing the correct endpoint without needing two-pass.
+
+#### Caveats
+
+This is an **experimental** feature. Nil values and empty strings from unresolved template
+expressions are stripped from the accumulator to prevent feeding placeholders into other files.
+Intentional `key: ~` deletions are preserved in the final merge output. When `stripNullValues` is
+enabled, it operates on the final merged result — not on the per-file accumulator.
 
 ### Two-pass rendering
 
