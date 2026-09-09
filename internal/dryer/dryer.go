@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/lansweeper-oss/helm-dryer/internal/argo"
@@ -181,37 +182,19 @@ func (in *Input) compoundValues(initialValues map[string]any) (map[string]any, e
 func (in *Input) processValuesFiles(
 	initialValues, runtimeValues, cliVals map[string]any,
 ) (map[string]any, error) {
-	// +1 for cliVals appended at the end
-	templatedData := make([]map[string]any, 0, len(in.Data.Files)+len(in.Data.InitialValues)+1)
+	var (
+		templatedData []map[string]any
+		err           error
+	)
 
-	for _, file := range in.Data.Files {
-		fileWithPath, err := in.resolveValuesFile(file)
-		if err != nil {
-			// a misconfigured path is an error even when missing files are ignored
-			return nil, err
-		}
+	if in.Settings.OnTheFly {
+		templatedData, err = in.processValuesFilesOnTheFly(initialValues, runtimeValues)
+	} else {
+		templatedData, err = in.processValuesFilesForward(initialValues, runtimeValues)
+	}
 
-		_, err = os.Stat(fileWithPath)
-		if errors.Is(err, os.ErrNotExist) {
-			if in.Settings.IgnoreMissing {
-				slog.Debug("Ignoring missing file", "file", file, "resolved", fileWithPath)
-
-				continue
-			}
-
-			return nil, fmt.Errorf("%w: %s (resolved to %s)", os.ErrNotExist, file, fileWithPath)
-		} else if err != nil {
-			return nil, fmt.Errorf("failed to stat values file %s: %w", fileWithPath, err)
-		}
-
-		slog.Debug("Reading values file: " + fileWithPath)
-
-		data, err := in.templateYAMLFile(fileWithPath, initialValues, runtimeValues)
-		if err != nil {
-			return nil, fmt.Errorf("error reading values file %s: %w", fileWithPath, err)
-		}
-
-		templatedData = append(templatedData, data)
+	if err != nil {
+		return nil, err
 	}
 
 	// Initial values files sit between values files and --set
@@ -231,6 +214,99 @@ func (in *Input) processValuesFiles(
 	}
 
 	return merged, nil
+}
+
+// processValuesFilesForward templates each file in order using the same initial values.
+func (in *Input) processValuesFilesForward(
+	initialValues, runtimeValues map[string]any,
+) ([]map[string]any, error) {
+	templatedData := make([]map[string]any, 0, len(in.Data.Files))
+
+	for _, file := range in.Data.Files {
+		data, err := in.templateValuesFile(file, initialValues, runtimeValues)
+		if err != nil {
+			return nil, err
+		}
+
+		if data != nil {
+			templatedData = append(templatedData, data)
+		}
+	}
+
+	return templatedData, nil
+}
+
+// processValuesFilesOnTheFly traverses files in reverse order, merging resolved values into an
+// accumulator after each file. Later files (higher priority) are templated first; their resolved
+// values feed into earlier files. The accumulator always wins, preserving the priority chain:
+// initialValues > last file > … > first file.
+func (in *Input) processValuesFilesOnTheFly(
+	initialValues, runtimeValues map[string]any,
+) ([]map[string]any, error) {
+	templatedData := make([]map[string]any, 0, len(in.Data.Files))
+
+	accumulator, err := utils.DeepCopy(initialValues)
+	if err != nil {
+		return nil, fmt.Errorf("error copying initial values: %w", err)
+	}
+
+	for _, file := range slices.Backward(in.Data.Files) {
+		data, err := in.templateValuesFile(file, accumulator, runtimeValues)
+		if err != nil {
+			return nil, err
+		}
+
+		if data == nil {
+			continue
+		}
+
+		resolved := values.ResolvedValues(data)
+
+		err = values.MergeYamlMaps(resolved, accumulator)
+		if err != nil {
+			return nil, fmt.Errorf("error merging resolved values from %s: %w", file, err)
+		}
+
+		accumulator = resolved
+		templatedData = append(templatedData, data)
+	}
+
+	slices.Reverse(templatedData)
+
+	return templatedData, nil
+}
+
+// templateValuesFile resolves, validates and templates a single values file.
+// Returns nil when the file is missing and IgnoreMissing is set.
+func (in *Input) templateValuesFile(
+	file string, vals, runtimeValues map[string]any,
+) (map[string]any, error) {
+	fileWithPath, err := in.resolveValuesFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = os.Stat(fileWithPath)
+	if errors.Is(err, os.ErrNotExist) {
+		if in.Settings.IgnoreMissing {
+			slog.Debug("Ignoring missing file", "file", file, "resolved", fileWithPath)
+
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("%w: %s (resolved to %s)", os.ErrNotExist, file, fileWithPath)
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to stat values file %s: %w", fileWithPath, err)
+	}
+
+	slog.Debug("Reading values file: " + fileWithPath)
+
+	data, err := in.templateYAMLFile(fileWithPath, vals, runtimeValues)
+	if err != nil {
+		return nil, fmt.Errorf("error reading values file %s: %w", fileWithPath, err)
+	}
+
+	return data, nil
 }
 
 // loadInitialValues reads YAML files and returns them as a slice of maps, preserving order

@@ -1009,6 +1009,170 @@ func TestInitialValuesCLITakesPrecedence(t *testing.T) {
 	assert.Equal(t, "from-cli", out["domain"], "CLI --set should take precedence over initial values file")
 }
 
+// On-the-fly tests: file B (tpl) references values defined in file A (base).
+// File order is [tpl, base] so that in reverse traversal base is processed first
+// and its resolved values feed into the tpl file's accumulator.
+var testFilesOnTheFly = []string{"values.onthefly.tpl.yaml", "values.onthefly.base.yaml"}
+
+func TestOnTheFlyResolvesAcrossFiles(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFilesOnTheFly)
+	test.Settings.OnTheFly = true
+	test.Settings.IgnoreEmpty = true
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err, "The output values should be a valid YAML")
+
+	app, ok := out["app"].(map[string]any)
+	require.True(t, ok, "Expected 'app' key in output")
+
+	assert.Equal(t, "staging", app["environment"],
+		"On-the-fly should resolve cross-file .Values.environment")
+	assert.Equal(t, "https://api.eu-west-1.example.com", app["endpoint"],
+		"On-the-fly should resolve cross-file .Values.region in template expression")
+}
+
+func TestOnTheFlyDisabledLeavesUnresolved(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFilesOnTheFly)
+	test.Settings.OnTheFly = false
+	test.Settings.IgnoreEmpty = true
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error without on-the-fly")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err)
+
+	app, ok := out["app"].(map[string]any)
+	require.True(t, ok, "Expected 'app' key in output")
+
+	assert.NotEqual(t, "staging", app["environment"],
+		"Without on-the-fly, cross-file values should not be resolved")
+}
+
+func TestOnTheFlyInitialValuesWin(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFilesOnTheFly)
+	test.Settings.OnTheFly = true
+	test.Settings.IgnoreEmpty = true
+
+	// --set should override the base file value
+	test.Data.Set["environment"] = "production"
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err)
+
+	app, ok := out["app"].(map[string]any)
+	require.True(t, ok)
+
+	assert.Equal(t, "production", app["environment"],
+		"CLI --set should win over file values in on-the-fly mode")
+}
+
+func TestOnTheFlyNilValuesNotLeakIntoAccumulator(t *testing.T) {
+	t.Parallel()
+
+	// File order: [tpl-referencing-base, nil-file] — reverse processes nil-file first.
+	// nil-file has nullified: ~ which should NOT leak into the tpl file's accumulator.
+	test := setupTest(t, []string{
+		"values.onthefly.tpl.yaml",
+		"values.onthefly.nil.yaml",
+	})
+	test.Settings.OnTheFly = true
+	test.Settings.IgnoreEmpty = true
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err)
+
+	// environment and region should resolve from nil.yaml
+	app, ok := out["app"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "staging", app["environment"])
+	assert.Equal(t, "https://api.eu-west-1.example.com", app["endpoint"])
+
+	// nullified key should be nil in final output (from nil.yaml), not stripped by ResolvedValues
+	assert.Nil(t, out["nullified"], "Nil values from files should survive to final merge")
+}
+
+func TestOnTheFlyMissingKeyDoesNotPollute(t *testing.T) {
+	t.Parallel()
+
+	// missing.tpl.yaml references .Values.doesNotExist — this produces <no value> string.
+	// Verify it doesn't pollute the accumulator for other files.
+	test := setupTest(t, []string{
+		"values.onthefly.base.yaml",
+		"values.onthefly.missing.tpl.yaml",
+	})
+	test.Settings.OnTheFly = true
+	test.Settings.IgnoreEmpty = true
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err)
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err)
+
+	// base.yaml should still resolve cleanly
+	assert.Equal(t, "staging", out["environment"])
+	assert.Equal(t, "eu-west-1", out["region"])
+
+	// resolved key from missing.tpl should be present
+	resolved, ok := out["resolved"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "present", resolved["value"])
+}
+
+func TestOnTheFlyWithStripNullValues(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, []string{
+		"values.onthefly.tpl.yaml",
+		"values.onthefly.nil.yaml",
+	})
+	test.Settings.OnTheFly = true
+	test.Settings.IgnoreEmpty = true
+	test.Settings.StripNullValues = true
+
+	err := test.TemplateChart(context.Background())
+	require.NoError(t, err, "TemplateChart with on-the-fly + StripNullValues should not error")
+}
+
+func TestOnTheFlyExistingTestsStillPass(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFiles)
+	test.Settings.OnTheFly = true
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues with on-the-fly should not break existing files")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err, "The output values should be a valid YAML")
+
+	expected, err := utils.ParseYAMLFile(filepath.Join(test.Settings.Path, "values.expected.yaml"))
+	require.NoError(t, err, "Failed to parse expected values file")
+
+	for key, value := range test.Data.Set {
+		expected[key] = value
+	}
+
+	assert.Equal(t, expected, out,
+		"On-the-fly mode should produce identical output for non-cross-referencing files")
+}
+
 func TestIncorrectOutputFallback(t *testing.T) {
 	t.Parallel()
 

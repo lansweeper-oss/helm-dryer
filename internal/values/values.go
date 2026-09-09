@@ -45,6 +45,35 @@ func StripNilValues(m map[string]any) {
 	}
 }
 
+// ResolvedValues returns a deep copy of the map with nil values and empty strings removed.
+// After templateYAMLFile with missingkey=default, unresolved template expressions become
+// empty strings or nil; stripping them prevents feeding placeholders into later files.
+func ResolvedValues(m map[string]any) map[string]any {
+	result := make(map[string]any, len(m))
+
+	for key, val := range m {
+		switch v := val.(type) {
+		case nil:
+			continue
+		case string:
+			if v == "" {
+				continue
+			}
+
+			result[key] = v
+		case map[string]any:
+			sub := ResolvedValues(v)
+			if len(sub) > 0 {
+				result[key] = sub
+			}
+		default:
+			result[key] = v
+		}
+	}
+
+	return result
+}
+
 // DotNotationToMap reads a map[string]string coming from CLI input by supporting nested keys using
 // dot notation (e.g., "key.subkey").
 func DotNotationToMap(m map[string]string) (map[string]any, error) {

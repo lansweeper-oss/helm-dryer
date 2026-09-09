@@ -39,6 +39,7 @@ type Settings struct {
 	DelimLeft            string      `default:"{{"                                                            help:"Template left delimiter."              short:"L"`
 	DelimRight           string      `default:"}}"                                                            help:"Template right delimiter."             short:"R"`
 	IgnoreEmpty          bool        `help:"Ignore empty/null values in templated value files."               short:"I"`
+	OnTheFly             bool        `help:"Experimental. Merge resolved values on the fly across files."`
 	IgnoreMainValues     bool        `help:"When present, ignore the implicit load of main values.yaml file." short:"m"`
 	IgnoreMissing        bool        `help:"Ignore missing values files."                                     short:"i"`
 	Logging              Logging     `embed:""                                                                help:"Logging configuration."                prefix:"logging."`
