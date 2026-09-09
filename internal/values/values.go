@@ -51,23 +51,23 @@ func StripNilValues(m map[string]any) {
 func ResolvedValues(m map[string]any) map[string]any {
 	result := make(map[string]any, len(m))
 
-	for key, val := range m {
-		switch v := val.(type) {
+	for key, value := range m {
+		switch val := value.(type) {
 		case nil:
 			continue
 		case string:
-			if v == "" {
+			if val == "" {
 				continue
 			}
 
-			result[key] = v
+			result[key] = val
 		case map[string]any:
-			sub := ResolvedValues(v)
+			sub := ResolvedValues(val)
 			if len(sub) > 0 {
 				result[key] = sub
 			}
 		default:
-			result[key] = v
+			result[key] = val
 		}
 	}
 

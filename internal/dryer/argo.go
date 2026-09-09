@@ -90,19 +90,19 @@ func (in *Input) readSettingsParameters(param *argo.Parameter) {
 		{key: "twoPass", boolTarget: &in.Settings.TwoPass, kind: boolSetting},
 	}
 
-	for _, s := range settings {
-		val, ok := param.Map[s.key]
+	for idx := range settings {
+		val, ok := param.Map[settings[idx].key]
 		if !ok {
 			continue
 		}
 
-		switch s.kind {
+		switch settings[idx].kind {
 		case boolSetting:
-			*s.boolTarget = utils.ToBoolean(val)
+			*settings[idx].boolTarget = utils.ToBoolean(val)
 		case stringSetting:
-			slog.Debug("Overriding from settings parameter", "key", s.key)
+			slog.Debug("Overriding from settings parameter", "key", settings[idx].key)
 
-			*s.strTarget = val
+			*settings[idx].strTarget = val
 		}
 	}
 }

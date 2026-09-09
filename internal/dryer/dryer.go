@@ -203,12 +203,13 @@ func (in *Input) processValuesFiles(
 		return nil, err
 	}
 
-	templatedData = append(templatedData, initials...)
+	// +1 for cliVals
+	result := make([]map[string]any, 0, len(templatedData)+len(initials)+1)
+	result = append(result, templatedData...)
+	result = append(result, initials...)
+	result = append(result, cliVals)
 
-	// Finally add the values from cli.Set (valuesObject)
-	templatedData = append(templatedData, cliVals)
-
-	merged, err := values.MergeYAMLArrayOfMaps(templatedData)
+	merged, err := values.MergeYAMLArrayOfMaps(result)
 	if err != nil {
 		return nil, fmt.Errorf("error merging YAML data: %w", err)
 	}
@@ -228,7 +229,7 @@ func (in *Input) processValuesFilesForward(
 			return nil, err
 		}
 
-		if data != nil {
+		if len(data) > 0 {
 			templatedData = append(templatedData, data)
 		}
 	}
@@ -268,6 +269,7 @@ func (in *Input) processValuesFilesOnTheFly(
 		}
 
 		accumulator = resolved
+
 		templatedData = append(templatedData, data)
 	}
 
@@ -291,7 +293,7 @@ func (in *Input) templateValuesFile(
 		if in.Settings.IgnoreMissing {
 			slog.Debug("Ignoring missing file", "file", file, "resolved", fileWithPath)
 
-			return nil, nil
+			return map[string]any{}, nil
 		}
 
 		return nil, fmt.Errorf("%w: %s (resolved to %s)", os.ErrNotExist, file, fileWithPath)
