@@ -1,0 +1,3 @@
+app:
+  environment: {{ .Values.environment }}
+  endpoint: https://api.{{ .Values.region }}.example.com
