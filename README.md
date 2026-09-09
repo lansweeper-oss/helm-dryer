@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-72%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE_INT}%25-${COVERAGE_COLOR}) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -193,8 +193,7 @@ Flags:
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
       --initial-values=INITIAL-VALUES
-                                   YAML files with key-value pairs for the
-                                   values object.
+                                   YAML files merged into the values object.
       --credentials.file=STRING    Path to OCI registry credentials file.
       --credentials.namespace=STRING
                                    Kubernetes namespace for ArgoCD secrets
@@ -350,6 +349,8 @@ The following keys are expected under `ARGOCD_APP_PARAMETERS`:
   `values.yaml` may be required when using raw values. Entries are resolved from the Application
   folder, or from the root of the repository when the path is absolute
   (see [Values files paths](#values-files-paths)).
+- `initialValues`, an optional list of YAML files merged into the values object.
+  Later files override earlier ones, and `valuesObject` entries always win.
 - `valuesObject`, an optional map of input values.
 - `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values in templated value files.
 - `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before
@@ -374,6 +375,9 @@ spec:
           array:
             - values.tpl.yaml
             - values.stg.yaml
+        - name: initialValues
+          array:
+            - common-values.yaml
         - name: valuesObject
           map:
             image.tag: v1.2.3
@@ -718,6 +722,9 @@ repoServer:
           - name: settings
             collectionType: map
             title: Plugin Settings
+          - name: initialValues
+            collectionType: array
+            title: Initial Values Files
           - name: valueFiles
             collectionType: array
             title: Values Files

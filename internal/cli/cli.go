@@ -24,7 +24,7 @@ type Data struct {
 	ReleaseName      string            `env:"ARGOCD_APP_NAME"                                                  help:"Release name."      short:"r"`
 	ReleaseNamespace string            `env:"ARGOCD_APP_NAMESPACE"                                             help:"Release namespace." short:"n"`
 	Set              map[string]string `help:"Injected key value pairs."                                       mapsep:","                short:"v"`
-	InitialValues    []string          `help:"YAML files with key-value pairs for the values object."          type:"existingfile"`
+	InitialValues    []string          `help:"YAML files merged into the values object."                       type:"existingfile"`
 }
 
 // Logging holds the logging configuration for the application.

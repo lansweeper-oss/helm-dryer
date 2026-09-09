@@ -501,6 +501,77 @@ func TestRenderChartAsCMP(t *testing.T) {
 	)
 }
 
+func TestInitialValuesAsCMP(t *testing.T) {
+	t.Setenv("ARGOCD_APP_NAME", "test-release")
+	t.Setenv("ARGOCD_APP_NAMESPACE", "test")
+
+	test := setupTest(t, testFiles)
+
+	// Write an initial values file with the required set values as nested YAML
+	ivFile := filepath.Join(test.Settings.Path, "initial.yaml")
+
+	ivVals := make(map[string]any, len(testSet))
+	for k, v := range testSet {
+		ivVals[k] = v
+	}
+
+	ivVals["tags"] = map[string]any{"hello": "true"}
+
+	ivBytes, err := yaml.Marshal(ivVals)
+	require.NoError(t, err, "error marshalling initial values")
+
+	err = os.WriteFile(ivFile, ivBytes, 0o644)
+	require.NoError(t, err, "error writing initial values file")
+
+	testFilesAsJSON, _ := json.Marshal(testFiles)
+	ivFilesAsJSON, _ := json.Marshal([]string{ivFile})
+
+	t.Setenv(
+		"ARGOCD_APP_PARAMETERS",
+		`[
+			{
+				"name":"initialValues",
+				"array": `+string(ivFilesAsJSON)+`
+			},
+			{
+				"name":"valueFiles",
+				"array": `+string(testFilesAsJSON)+`
+			}
+		]`,
+	)
+
+	err = test.RenderChart(context.Background())
+	require.NoError(t, err, "RenderChart should not return an error")
+
+	yamlFile, err := os.ReadFile(test.Settings.Out)
+	require.NoError(t, err, "Cannot read output file")
+
+	dec := yaml.NewDecoder(bytes.NewReader(yamlFile))
+	numManifests := 0
+
+	for {
+		var data map[string]any
+
+		err := dec.Decode(&data)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		numManifests++
+
+		require.NoError(t, err, "Error decoding YAML")
+		assert.NotEmpty(t, data, "The rendered chart should not be empty")
+	}
+
+	msg := fmt.Sprintf("The rendered chart should have %d items", expectedHelloWorld.Manifests)
+	assert.Equal(
+		t,
+		expectedHelloWorld.Manifests,
+		numManifests,
+		msg,
+	)
+}
+
 func TestTwoPassRenderChartAsCMP(t *testing.T) {
 	test := setupTest(t, testFilesTwoPass)
 
@@ -868,12 +939,12 @@ func TestInitialValues(t *testing.T) {
 
 	test := setupTest(t, testFiles)
 
-	// Write a initial values file with flat key-value pairs
-	voFile := filepath.Join(t.TempDir(), "values-object.yaml")
-	err := os.WriteFile(voFile, []byte("foo-bar.logLevel: debug\nfoo-bar.serviceMonitor.enabled: \"false\"\n"), 0o644)
+	ivFile := filepath.Join(t.TempDir(), "initial.yaml")
+	ivContent := "foo-bar:\n  logLevel: debug\n  serviceMonitor:\n    enabled: \"false\"\n"
+	err := os.WriteFile(ivFile, []byte(ivContent), 0o644)
 	require.NoError(t, err, "error writing initial values file")
 
-	test.Data.InitialValues = []string{voFile}
+	test.Data.InitialValues = []string{ivFile}
 
 	err = test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
@@ -882,7 +953,7 @@ func TestInitialValues(t *testing.T) {
 	require.NoError(t, err, "The output values should be a valid YAML")
 
 	controllerValues, ok := out["foo-bar"].(map[string]any)
-	require.True(t, ok, "Error processing dot notation values from initial values file")
+	require.True(t, ok, "Expected nested foo-bar key from initial values file")
 	assert.Equal(t, "false", controllerValues["serviceMonitor"].(map[string]any)["enabled"])
 	assert.Equal(t, "debug", controllerValues["logLevel"])
 }
@@ -896,10 +967,10 @@ func TestInitialValuesMultiple(t *testing.T) {
 	file1 := filepath.Join(tmpDir, "vo1.yaml")
 	file2 := filepath.Join(tmpDir, "vo2.yaml")
 
-	err := os.WriteFile(file1, []byte("foo-bar.logLevel: info\n"), 0o644)
+	err := os.WriteFile(file1, []byte("foo-bar:\n  logLevel: info\n"), 0o644)
 	require.NoError(t, err)
 
-	err = os.WriteFile(file2, []byte("foo-bar.logLevel: debug\nfoo-bar.serviceMonitor.enabled: \"false\"\n"), 0o644)
+	err = os.WriteFile(file2, []byte("foo-bar:\n  logLevel: debug\n  serviceMonitor:\n    enabled: \"false\"\n"), 0o644)
 	require.NoError(t, err)
 
 	test.Data.InitialValues = []string{file1, file2}

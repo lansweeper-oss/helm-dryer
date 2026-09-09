@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -136,11 +135,6 @@ func (in *Input) TemplateValues(ctx context.Context) error {
 // be too noisy and not useful for an end user. We use those dependency values though to feed
 // the templating engine, so that the values files can use the dependencies as well.
 func (in *Input) compoundValues(initialValues map[string]any) (map[string]any, error) {
-	err := in.loadInitialValues()
-	if err != nil {
-		return nil, err
-	}
-
 	cliVals, err := values.DotNotationToMap(in.Data.Set)
 	if err != nil {
 		return nil, fmt.Errorf("error converting CLI set values to map: %w", err)
@@ -187,8 +181,8 @@ func (in *Input) compoundValues(initialValues map[string]any) (map[string]any, e
 func (in *Input) processValuesFiles(
 	initialValues, runtimeValues, cliVals map[string]any,
 ) (map[string]any, error) {
-	// +1 to accommodate the values Object (in.Data.Set) at the end of the slice
-	templatedData := make([]map[string]any, 0, len(in.Data.Files)+1)
+	// +1 for cliVals appended at the end
+	templatedData := make([]map[string]any, 0, len(in.Data.Files)+len(in.Data.InitialValues)+1)
 
 	for _, file := range in.Data.Files {
 		fileWithPath, err := in.resolveValuesFile(file)
@@ -220,6 +214,14 @@ func (in *Input) processValuesFiles(
 		templatedData = append(templatedData, data)
 	}
 
+	// Initial values files sit between values files and --set
+	initials, err := in.loadInitialValues()
+	if err != nil {
+		return nil, err
+	}
+
+	templatedData = append(templatedData, initials...)
+
 	// Finally add the values from cli.Set (valuesObject)
 	templatedData = append(templatedData, cliVals)
 
@@ -231,41 +233,37 @@ func (in *Input) processValuesFiles(
 	return merged, nil
 }
 
-// loadInitialValues reads YAML files containing flat key-value pairs and merges them
-// into Data.Set. Precedence: --set wins, then last file wins over earlier files. The file
-// list is cleared after loading to prevent re-loading on recursive calls (two-pass).
-func (in *Input) loadInitialValues() error {
+// loadInitialValues reads YAML files and returns them as a slice of maps, preserving order
+// so that later files override earlier ones when merged. The file list is cleared after
+// loading to prevent re-loading on recursive calls (two-pass).
+func (in *Input) loadInitialValues() ([]map[string]any, error) {
 	if len(in.Data.InitialValues) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	cliSet := in.Data.Set
-	merged := make(map[string]string)
+	result := make([]map[string]any, 0, len(in.Data.InitialValues))
 
 	for _, file := range in.Data.InitialValues {
 		content, err := os.ReadFile(file) //nolint:gosec // paths validated by kong existingfile type
 		if err != nil {
-			return fmt.Errorf("failed to read initial values file %s: %w", file, err)
+			return nil, fmt.Errorf("failed to read initial values file %s: %w", file, err)
 		}
 
-		var fileVals map[string]string
+		var fileVals map[string]any
 
 		err = yaml.Unmarshal(content, &fileVals)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal initial values file %s: %w", file, err)
+			return nil, fmt.Errorf("failed to unmarshal initial values file %s: %w", file, err)
 		}
 
 		slog.Debug("Loaded initial values file", "file", file, "keys", len(fileVals))
 
-		maps.Copy(merged, fileVals)
+		result = append(result, fileVals)
 	}
 
-	maps.Copy(merged, cliSet)
-
-	in.Data.Set = merged
 	in.Data.InitialValues = nil
 
-	return nil
+	return result, nil
 }
 
 // runtimeValues collects the runtime values (mainly .Release and .Capabilities).

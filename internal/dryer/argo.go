@@ -39,7 +39,7 @@ func (in *Input) ReadParameters(parameters []argo.Parameter) {
 	for i := range parameters {
 		param := &parameters[i]
 		switch param.Name {
-		case "intialValues":
+		case "initialValues":
 			slog.Debug("Reading initialValues")
 
 			in.Data.InitialValues = param.Array

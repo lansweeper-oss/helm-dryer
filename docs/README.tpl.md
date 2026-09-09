@@ -273,6 +273,8 @@ The following keys are expected under `ARGOCD_APP_PARAMETERS`:
   `values.yaml` may be required when using raw values. Entries are resolved from the Application
   folder, or from the root of the repository when the path is absolute
   (see [Values files paths](#values-files-paths)).
+- `initialValues`, an optional list of YAML files merged into the values object.
+  Later files override earlier ones, and `valuesObject` entries always win.
 - `valuesObject`, an optional map of input values.
 - `ignoreEmpty` [optional: `false`] a flag to ignore empty/null values in templated value files.
 - `stripNullValues` [optional: `false`] strip null values (`key: ~`) from chart values before
@@ -297,6 +299,9 @@ spec:
           array:
             - values.tpl.yaml
             - values.stg.yaml
+        - name: initialValues
+          array:
+            - common-values.yaml
         - name: valuesObject
           map:
             image.tag: v1.2.3
@@ -641,6 +646,9 @@ repoServer:
           - name: settings
             collectionType: map
             title: Plugin Settings
+          - name: initialValues
+            collectionType: array
+            title: Initial Values Files
           - name: valueFiles
             collectionType: array
             title: Values Files
