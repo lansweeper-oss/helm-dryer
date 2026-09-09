@@ -510,8 +510,9 @@ When running `dryer` container with a `readOnlyRootFilesystem: true` security co
 #### Why
 
 In the default rendering mode, every values file is templated against the same `.Values` context
-(chart dependencies + `valuesObject`). If one file defines a value that another file references via
-`.Values`, the reference will be empty — the files are independent of each other during templating.
+(chart dependencies + `valuesObject`).
+If one file defines a value that another file references via `.Values`, the reference will be empty.
+The files are **independent of each other during templating**.
 
 On-the-fly mode solves this by feeding resolved values from one file into the next, so cross-file
 `.Values` references work in a single pass.
@@ -539,18 +540,18 @@ graph LR
   F --> G[Final merge in original order]
 ```
 
-Priority chain: `initialValues` > last file > … > first file, matching standard Helm semantics.
+Priority chain: `initialValues` > last file > ... > first file, matching standard Helm semantics.
 
 #### Example
 
-`values.base.yaml` — plain YAML, no templates:
+`values.base.yaml` - plain YAML, no templates:
 
 ```yaml
 environment: staging
 region: eu-west-1
 ```
 
-`values.app.tpl.yaml` — references base values:
+`values.app.tpl.yaml` - references base values:
 
 ```yaml
 app:
@@ -559,15 +560,18 @@ app:
 ```
 
 With file order `[values.app.tpl.yaml, values.base.yaml]` and `onTheFly: "true"`, the base file is
-processed first (reverse order). Its resolved `region` and `environment` values feed into the tpl
-file, producing the correct endpoint without needing two-pass.
+processed first (reverse order).
+Its resolved `region` and `environment` values feed into the tpl file, producing the correct
+endpoint without needing two-pass.
 
 #### Caveats
 
-This is an **experimental** feature. Nil values and empty strings from unresolved template
+This is an **experimental** feature. `nil` values and empty strings from unresolved template
 expressions are stripped from the accumulator to prevent feeding placeholders into other files.
-Intentional `key: ~` deletions are preserved in the final merge output. When `stripNullValues` is
-enabled, it operates on the final merged result — not on the per-file accumulator.
+Intentional `key: ~` deletions are preserved in the final merge output.
+
+When `stripNullValues` is enabled, it operates on the final merged result, not on the per-file
+accumulator.
 
 ### Two-pass rendering
 

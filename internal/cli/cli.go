@@ -20,11 +20,11 @@ type Credentials struct {
 type Data struct {
 	APIVersions      []string          `default:""                                                             env:"KUBE_API_VERSIONS"   help:"API versions (capabilities)." short:"a"`
 	Files            []string          `help:"Values files, relative to Path (or to --repo-root if absolute)." short:"f"                 type:"string"`
+	InitialValues    []string          `help:"YAML files merged into the values object."                       type:"existingfile"`
 	KubeVersion      string            `default:""                                                             env:"KUBE_VERSION"        help:"Kubernetes version."          short:"k"`
 	ReleaseName      string            `env:"ARGOCD_APP_NAME"                                                  help:"Release name."      short:"r"`
 	ReleaseNamespace string            `env:"ARGOCD_APP_NAMESPACE"                                             help:"Release namespace." short:"n"`
 	Set              map[string]string `help:"Injected key value pairs."                                       mapsep:","                short:"v"`
-	InitialValues    []string          `help:"YAML files merged into the values object."                       type:"existingfile"`
 }
 
 // Logging holds the logging configuration for the application.
@@ -39,10 +39,10 @@ type Settings struct {
 	DelimLeft            string      `default:"{{"                                                            help:"Template left delimiter."              short:"L"`
 	DelimRight           string      `default:"}}"                                                            help:"Template right delimiter."             short:"R"`
 	IgnoreEmpty          bool        `help:"Ignore empty/null values in templated value files."               short:"I"`
-	OnTheFly             bool        `help:"Experimental. Merge resolved values on the fly across files."`
 	IgnoreMainValues     bool        `help:"When present, ignore the implicit load of main values.yaml file." short:"m"`
 	IgnoreMissing        bool        `help:"Ignore missing values files."                                     short:"i"`
 	Logging              Logging     `embed:""                                                                help:"Logging configuration."                prefix:"logging."`
+	OnTheFly             bool        `help:"Experimental. Merge resolved values on the fly across files."`
 	Out                  string      `default:""                                                              help:"Output file (default: stdout)."        short:"o"`
 	Path                 string      `default:"."                                                             help:"Relative path to the chart."           short:"p"                                type:"existingdir"`
 	RepoRoot             string      `help:"Repository root, base for absolute values files."                 type:"existingdir"`

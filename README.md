@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-76%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-72%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -187,13 +187,13 @@ Flags:
                                    ($KUBE_API_VERSIONS).
   -f, --files=FILES                Values files, relative to Path (or to
                                    --repo-root if absolute).
+      --initial-values=INITIAL-VALUES
+                                   YAML files merged into the values object.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
                                    Release namespace ($ARGOCD_APP_NAMESPACE).
   -v, --set=KEY=VALUE,...          Injected key value pairs.
-      --initial-values=INITIAL-VALUES
-                                   YAML files merged into the values object.
       --credentials.file=STRING    Path to OCI registry credentials file.
       --credentials.namespace=STRING
                                    Kubernetes namespace for ArgoCD secrets
@@ -210,13 +210,13 @@ Flags:
   -R, --delim-right="}}"           Template right delimiter.
   -I, --ignore-empty               Ignore empty/null values in templated value
                                    files.
-      --on-the-fly                 Experimental. Merge resolved values on the
-                                   fly across files.
   -m, --ignore-main-values         When present, ignore the implicit load of
                                    main values.yaml file.
   -i, --ignore-missing             Ignore missing values files.
       --logging.debug              Emit debug logs in addition to info logs.
       --logging.format="json"      Log format (json|console).
+      --on-the-fly                 Experimental. Merge resolved values on the
+                                   fly across files.
   -o, --out=""                     Output file (default: stdout).
   -p, --path="."                   Relative path to the chart.
       --repo-root=STRING           Repository root, base for absolute values
@@ -588,8 +588,9 @@ When running `dryer` container with a `readOnlyRootFilesystem: true` security co
 #### Why
 
 In the default rendering mode, every values file is templated against the same `.Values` context
-(chart dependencies + `valuesObject`). If one file defines a value that another file references via
-`.Values`, the reference will be empty — the files are independent of each other during templating.
+(chart dependencies + `valuesObject`).
+If one file defines a value that another file references via `.Values`, the reference will be empty.
+The files are **independent of each other during templating**.
 
 On-the-fly mode solves this by feeding resolved values from one file into the next, so cross-file
 `.Values` references work in a single pass.
@@ -617,18 +618,18 @@ graph LR
   F --> G[Final merge in original order]
 ```
 
-Priority chain: `initialValues` > last file > … > first file, matching standard Helm semantics.
+Priority chain: `initialValues` > last file > ... > first file, matching standard Helm semantics.
 
 #### Example
 
-`values.base.yaml` — plain YAML, no templates:
+`values.base.yaml` - plain YAML, no templates:
 
 ```yaml
 environment: staging
 region: eu-west-1
 ```
 
-`values.app.tpl.yaml` — references base values:
+`values.app.tpl.yaml` - references base values:
 
 ```yaml
 app:
@@ -637,15 +638,18 @@ app:
 ```
 
 With file order `[values.app.tpl.yaml, values.base.yaml]` and `onTheFly: "true"`, the base file is
-processed first (reverse order). Its resolved `region` and `environment` values feed into the tpl
-file, producing the correct endpoint without needing two-pass.
+processed first (reverse order).
+Its resolved `region` and `environment` values feed into the tpl file, producing the correct
+endpoint without needing two-pass.
 
 #### Caveats
 
-This is an **experimental** feature. Nil values and empty strings from unresolved template
+This is an **experimental** feature. `nil` values and empty strings from unresolved template
 expressions are stripped from the accumulator to prevent feeding placeholders into other files.
-Intentional `key: ~` deletions are preserved in the final merge output. When `stripNullValues` is
-enabled, it operates on the final merged result — not on the per-file accumulator.
+Intentional `key: ~` deletions are preserved in the final merge output.
+
+When `stripNullValues` is enabled, it operates on the final merged result, not on the per-file
+accumulator.
 
 ### Two-pass rendering
 
