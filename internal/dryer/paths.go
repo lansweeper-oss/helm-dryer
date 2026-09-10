@@ -109,8 +109,8 @@ func repoRootFromSourcePath(chartPath, sourcePath string) (repoRootResult, error
 	segments := strings.Split(cleanSource, separator)
 
 	// try each suffix from longest (full sourcePath) to shortest (last segment only)
-	for i := range segments {
-		candidate := separator + filepath.Join(segments[i:]...)
+	for offset := range segments {
+		candidate := separator + filepath.Join(segments[offset:]...)
 
 		root, trimmed := strings.CutSuffix(absChartPath, candidate)
 		if !trimmed {
@@ -123,8 +123,8 @@ func repoRootFromSourcePath(chartPath, sourcePath string) (repoRootResult, error
 
 		result := repoRootResult{root: root}
 
-		if i > 0 {
-			result.trimmedPrefix = filepath.Join(segments[:i]...)
+		if offset > 0 {
+			result.trimmedPrefix = filepath.Join(segments[:offset]...)
 		}
 
 		return result, nil
