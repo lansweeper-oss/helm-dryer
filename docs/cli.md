@@ -21,6 +21,7 @@ Flags:
                                    --repo-root if absolute).
       --initial-values=INITIAL-VALUES
                                    YAML files merged into the values object.
+                                   Paths follow valueFiles resolution.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -103,6 +104,7 @@ Flags:
                                    --repo-root if absolute).
       --initial-values=INITIAL-VALUES
                                    YAML files merged into the values object.
+                                   Paths follow valueFiles resolution.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -165,6 +167,7 @@ Flags:
                                    --repo-root if absolute).
       --initial-values=INITIAL-VALUES
                                    YAML files merged into the values object.
+                                   Paths follow valueFiles resolution.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -230,6 +233,7 @@ Flags:
                                    --repo-root if absolute).
       --initial-values=INITIAL-VALUES
                                    YAML files merged into the values object.
+                                   Paths follow valueFiles resolution.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING
@@ -295,6 +299,7 @@ Flags:
                                    --repo-root if absolute).
       --initial-values=INITIAL-VALUES
                                    YAML files merged into the values object.
+                                   Paths follow valueFiles resolution.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING

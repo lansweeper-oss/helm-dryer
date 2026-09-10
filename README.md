@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-76%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE_INT}%25-${COVERAGE_COLOR}) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -189,6 +189,7 @@ Flags:
                                    --repo-root if absolute).
       --initial-values=INITIAL-VALUES
                                    YAML files merged into the values object.
+                                   Paths follow valueFiles resolution.
   -k, --kube-version=""            Kubernetes version ($KUBE_VERSION).
   -r, --release-name=STRING        Release name ($ARGOCD_APP_NAME).
   -n, --release-namespace=STRING

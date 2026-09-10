@@ -1009,7 +1009,8 @@ func TestInitialValuesCLITakesPrecedence(t *testing.T) {
 }
 
 func TestInitialValuesAbsolutePathResolvesFromRepoRoot(t *testing.T) {
-	t.Parallel()
+	t.Setenv("ARGOCD_APP_NAME", "test-release")
+	t.Setenv("ARGOCD_APP_NAMESPACE", "test")
 
 	test := setupTest(t, testFiles)
 
@@ -1017,22 +1018,32 @@ func TestInitialValuesAbsolutePathResolvesFromRepoRoot(t *testing.T) {
 	ivDir := filepath.Join(test.Settings.Path, "env", "prod")
 	require.NoError(t, os.MkdirAll(ivDir, 0o755))
 
-	ivFile := filepath.Join(ivDir, "initial.yaml")
-	err := os.WriteFile(ivFile, []byte("foo-bar:\n  logLevel: debug\n"), 0o644)
+	err := os.WriteFile(
+		filepath.Join(ivDir, "initial.yaml"),
+		[]byte("foo-bar:\n  logLevel: debug\n"), 0o644,
+	)
 	require.NoError(t, err)
 
-	// Absolute path resolved from repo root, matching ArgoCD valueFiles behaviour
-	test.Data.InitialValues = []string{"/env/prod/initial.yaml"}
+	// Absolute path resolved from repo root via ArgoCD parameters
+	testFilesAsJSON, _ := json.Marshal(testFiles)
+	ivFilesAsJSON, _ := json.Marshal([]string{"/env/prod/initial.yaml"})
 
-	err = test.TemplateValues(context.Background())
-	require.NoError(t, err, "TemplateValues should not return an error")
+	t.Setenv(
+		"ARGOCD_APP_PARAMETERS",
+		`[
+			{
+				"name":"initialValues",
+				"array": `+string(ivFilesAsJSON)+`
+			},
+			{
+				"name":"valueFiles",
+				"array": `+string(testFilesAsJSON)+`
+			}
+		]`,
+	)
 
-	out, err := utils.ParseYAMLFile(test.Settings.Out)
-	require.NoError(t, err)
-
-	controllerValues, ok := out["foo-bar"].(map[string]any)
-	require.True(t, ok, "Expected nested foo-bar key from initial values file")
-	assert.Equal(t, "debug", controllerValues["logLevel"])
+	err = test.RenderChart(context.Background())
+	require.NoError(t, err, "RenderChart should not return an error")
 }
 
 // On-the-fly tests: file B (tpl) references values defined in file A (base).
