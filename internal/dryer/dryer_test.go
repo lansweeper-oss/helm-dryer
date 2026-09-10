@@ -524,7 +524,7 @@ func TestInitialValuesAsCMP(t *testing.T) {
 	require.NoError(t, err, "error writing initial values file")
 
 	testFilesAsJSON, _ := json.Marshal(testFiles)
-	ivFilesAsJSON, _ := json.Marshal([]string{ivFile})
+	ivFilesAsJSON, _ := json.Marshal([]string{"initial.yaml"})
 
 	t.Setenv(
 		"ARGOCD_APP_PARAMETERS",
@@ -939,12 +939,12 @@ func TestInitialValues(t *testing.T) {
 
 	test := setupTest(t, testFiles)
 
-	ivFile := filepath.Join(t.TempDir(), "initial.yaml")
+	ivFile := filepath.Join(test.Settings.Path, "initial.yaml")
 	ivContent := "foo-bar:\n  logLevel: debug\n  serviceMonitor:\n    enabled: \"false\"\n"
 	err := os.WriteFile(ivFile, []byte(ivContent), 0o644)
 	require.NoError(t, err, "error writing initial values file")
 
-	test.Data.InitialValues = []string{ivFile}
+	test.Data.InitialValues = []string{"initial.yaml"}
 
 	err = test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
@@ -963,9 +963,8 @@ func TestInitialValuesMultiple(t *testing.T) {
 
 	test := setupTest(t, testFiles)
 
-	tmpDir := t.TempDir()
-	file1 := filepath.Join(tmpDir, "vo1.yaml")
-	file2 := filepath.Join(tmpDir, "vo2.yaml")
+	file1 := filepath.Join(test.Settings.Path, "vo1.yaml")
+	file2 := filepath.Join(test.Settings.Path, "vo2.yaml")
 
 	err := os.WriteFile(file1, []byte("foo-bar:\n  logLevel: info\n"), 0o644)
 	require.NoError(t, err)
@@ -973,7 +972,7 @@ func TestInitialValuesMultiple(t *testing.T) {
 	err = os.WriteFile(file2, []byte("foo-bar:\n  logLevel: debug\n  serviceMonitor:\n    enabled: \"false\"\n"), 0o644)
 	require.NoError(t, err)
 
-	test.Data.InitialValues = []string{file1, file2}
+	test.Data.InitialValues = []string{"vo1.yaml", "vo2.yaml"}
 
 	err = test.TemplateValues(context.Background())
 	require.NoError(t, err, "TemplateValues should not return an error")
@@ -992,11 +991,11 @@ func TestInitialValuesCLITakesPrecedence(t *testing.T) {
 
 	test := setupTest(t, testFiles)
 
-	voFile := filepath.Join(t.TempDir(), "values-object.yaml")
+	voFile := filepath.Join(test.Settings.Path, "values-object.yaml")
 	err := os.WriteFile(voFile, []byte("domain: from-file\n"), 0o644)
 	require.NoError(t, err, "error writing initial values file")
 
-	test.Data.InitialValues = []string{voFile}
+	test.Data.InitialValues = []string{"values-object.yaml"}
 	// CLI --set should win over file
 	test.Data.Set["domain"] = "from-cli"
 
@@ -1007,6 +1006,33 @@ func TestInitialValuesCLITakesPrecedence(t *testing.T) {
 	require.NoError(t, err, "The output values should be a valid YAML")
 
 	assert.Equal(t, "from-cli", out["domain"], "CLI --set should take precedence over initial values file")
+}
+
+func TestInitialValuesAbsolutePathResolvesFromRepoRoot(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, testFiles)
+
+	// Place initial values in a subdirectory to simulate repo-root-relative resolution
+	ivDir := filepath.Join(test.Settings.Path, "env", "prod")
+	require.NoError(t, os.MkdirAll(ivDir, 0o755))
+
+	ivFile := filepath.Join(ivDir, "initial.yaml")
+	err := os.WriteFile(ivFile, []byte("foo-bar:\n  logLevel: debug\n"), 0o644)
+	require.NoError(t, err)
+
+	// Absolute path resolved from repo root, matching ArgoCD valueFiles behaviour
+	test.Data.InitialValues = []string{"/env/prod/initial.yaml"}
+
+	err = test.TemplateValues(context.Background())
+	require.NoError(t, err, "TemplateValues should not return an error")
+
+	out, err := utils.ParseYAMLFile(test.Settings.Out)
+	require.NoError(t, err)
+
+	controllerValues, ok := out["foo-bar"].(map[string]any)
+	require.True(t, ok, "Expected nested foo-bar key from initial values file")
+	assert.Equal(t, "debug", controllerValues["logLevel"])
 }
 
 // On-the-fly tests: file B (tpl) references values defined in file A (base).
