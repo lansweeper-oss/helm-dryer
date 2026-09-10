@@ -648,6 +648,19 @@ This is an **experimental** feature. `nil` values and empty strings from unresol
 expressions are stripped from the accumulator to prevent feeding placeholders into other files.
 Intentional `key: ~` deletions are preserved in the final merge output.
 
+This stripping only affects the **accumulator** used for cross-file templating context. In other
+words, the collection of values which Dryer will use to render the values.
+The raw templated output of each file (including `nil` values) is preserved and participates in the
+final merge. This means:
+
+- A `nil` (`~`) or empty-string value means **"I don't set this key"** during accumulator building,
+  it cannot suppress a key defined in another file's templating context.
+- File ordering only affects the accumulator for keys where **both files provide non-nil, non-empty
+  values**; for keys where one file provides a value and the other provides nil/empty, the concrete
+  value always wins in the accumulator.
+- Intentional `key: ~` **null-deletions still work** in the final merge output, because the raw
+  per-file data (with nils intact) feeds into the final merge, not the stripped accumulator.
+
 When `stripNullValues` is enabled, it operates on the final merged result, not on the per-file
 accumulator.
 
