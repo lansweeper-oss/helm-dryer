@@ -18,13 +18,13 @@ type Credentials struct {
 
 // Data holds all the possible values feeding the application.
 type Data struct {
-	APIVersions      []string          `default:""                                                             env:"KUBE_API_VERSIONS"   help:"API versions (capabilities)." short:"a"`
-	Files            []string          `help:"Values files, relative to Path (or to --repo-root if absolute)." short:"f"                 type:"string"`
-	InitialValues    []string          `help:"YAML files merged into the values object."                       type:"existingfile"`
-	KubeVersion      string            `default:""                                                             env:"KUBE_VERSION"        help:"Kubernetes version."          short:"k"`
-	ReleaseName      string            `env:"ARGOCD_APP_NAME"                                                  help:"Release name."      short:"r"`
-	ReleaseNamespace string            `env:"ARGOCD_APP_NAMESPACE"                                             help:"Release namespace." short:"n"`
-	Set              map[string]string `help:"Injected key value pairs."                                       mapsep:","                short:"v"`
+	APIVersions      []string          `default:""                                                                           env:"KUBE_API_VERSIONS"   help:"API versions (capabilities)." short:"a"`
+	Files            []string          `help:"Values files, relative to Path (or to --repo-root if absolute)."               short:"f"                 type:"string"`
+	InitialValues    []string          `help:"YAML files merged into the values object. Paths follow valueFiles resolution." type:"string"`
+	KubeVersion      string            `default:""                                                                           env:"KUBE_VERSION"        help:"Kubernetes version."          short:"k"`
+	ReleaseName      string            `env:"ARGOCD_APP_NAME"                                                                help:"Release name."      short:"r"`
+	ReleaseNamespace string            `env:"ARGOCD_APP_NAMESPACE"                                                           help:"Release namespace." short:"n"`
+	Set              map[string]string `help:"Injected key value pairs."                                                     mapsep:","                short:"v"`
 }
 
 // Logging holds the logging configuration for the application.

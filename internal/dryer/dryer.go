@@ -322,9 +322,14 @@ func (in *Input) loadInitialValues() ([]map[string]any, error) {
 	result := make([]map[string]any, 0, len(in.Data.InitialValues))
 
 	for _, file := range in.Data.InitialValues {
-		content, err := os.ReadFile(file) //nolint:gosec // paths validated by kong existingfile type
+		resolved, err := in.resolveValuesFile(file)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read initial values file %s: %w", file, err)
+			return nil, fmt.Errorf("failed to resolve initial values file %s: %w", file, err)
+		}
+
+		content, err := os.ReadFile(resolved) //nolint:gosec // paths validated by resolveValuesFile
+		if err != nil {
+			return nil, fmt.Errorf("failed to read initial values file %s: %w", resolved, err)
 		}
 
 		var fileVals map[string]any
