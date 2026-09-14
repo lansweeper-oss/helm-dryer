@@ -27,6 +27,11 @@ type Input struct {
 	CredsStore  *repocreds.Store
 	Data        cli.Data
 	Settings    cli.Settings
+
+	// repoRootPrefix is the repository-relative path of the tarball root, non-empty only when
+	// ArgoCD's manifest-generate-paths annotation narrowed the tarball to a subdirectory.
+	// Derived from the environment, never set by the user.
+	repoRootPrefix string
 }
 
 var kubeVersionPattern = regexp.MustCompile(`^v?\d+\.\d+(\..+)?$`)
