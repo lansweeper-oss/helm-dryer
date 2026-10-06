@@ -239,7 +239,7 @@ Later files override earlier ones, and `--set` always wins:
 go run . get -f tests/values.tpl.yaml --initial-values common.yaml --initial-values env/staging.yaml --set domain=override
 ```
 
-> Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.
+> Please note that out of the box, go template and [Sprig][] (via [Sprout][], which also exposes its own function names) are supported as in a regular Helm template.
 > Additionally, `fromYaml` and `toYaml` functions are available.
 >
 > At the moment, you can reuse a value already defined **if** the two-pass experimental feature is enabled,
@@ -763,4 +763,5 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for development guidelines.
 [CMP Implementation]: https://argo-cd.readthedocs.io/en/stable/proposals/parameterized-config-management-plugins/#implementation-detailsnotesconstraints
 [Kubernetes and Chart functions]: https://helm.sh/docs/chart_template_guide/function_list/#kubernetes-and-chart-functions
 [Sprig]: http://masterminds.github.io/sprig/
+[Sprout]: https://docs.atom.codes/sprout
 [YAML anchors]: https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases
