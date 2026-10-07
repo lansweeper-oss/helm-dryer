@@ -321,12 +321,21 @@ go run . get -f tests/values.tpl.yaml --initial-values common.yaml --initial-val
 > Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.
 > Additionally, `fromYaml` and `toYaml` functions are available.
 >
-> At the moment, you can reuse a value already defined **if** the two-pass experimental feature is enabled,
+> At the moment, you can reuse a value already defined **if** the [two-pass](#two-pass-rendering) experimental feature is enabled,
 > e.g. the following is supported:
 
 ```yaml
 foo: bar
 url: example.com/{{ .Values.foo }}  # would produce example.com/bar
+```
+
+> When both values live in the same file, prefer a template variable instead, which doesn't need two-pass:
+
+```yaml
+{{- $foo := "bar" }}
+{{- $url := print "example.com/" $foo }}
+foo: {{ $foo }}
+url: {{ $url }}  # would produce example.com/bar
 ```
 
 ### Template a Helm chart
@@ -672,7 +681,7 @@ accumulator.
 In a single-pass render, `.Values` only contains the injected `valuesObject` parameters. Go
 template variables (`$var`) can avoid repetition within a single file, but they are scoped to that
 template execution — they cannot be shared across files. When values that depend on each other
-live in the same file, prefer using `$var` instead of enabling two-pass.
+live in the same file, prefer using `$var` instead of enabling two-pass (see [Render values](#render-values)).
 
 Two-pass is only needed when values are split across different files and one file needs to
 reference a computed value from another:
