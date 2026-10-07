@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/lansweeper-oss/helm-dryer/internal/argo"
@@ -33,6 +35,13 @@ type Input struct {
 	// Derived from the environment, never set by the user.
 	repoRootPrefix string
 }
+
+const (
+	// maxTemplatePasses bounds the two-pass mode while it waits for the values to stop changing.
+	maxTemplatePasses = 10
+	// unresolvedPlaceholder is what text/template prints for a missing value.
+	unresolvedPlaceholder = "<no value>"
+)
 
 var kubeVersionPattern = regexp.MustCompile(`^v?\d+\.\d+(\..+)?$`)
 
@@ -167,20 +176,99 @@ func (in *Input) compoundValues(initialValues map[string]any) (map[string]any, e
 	}
 
 	if in.Settings.TwoPass {
-		// NOTE: TwoPass is set to false to prevent infinite recursion and to switch the second pass
+		// NOTE: TwoPass is set to false to prevent infinite recursion and to switch the next passes
 		// to missingkey=error mode (via templateYAMLFile). This permanently mutates the Input, which
 		// is acceptable because TwoPass is consumed exactly once per TemplateValues/TemplateChart call.
 		in.Settings.TwoPass = false
-		// merge again over the initial values to ensure they are not lost
-		err = values.MergeYamlMaps(vals, processed)
+
+		return in.resolveUntilStable(vals, processed)
+	}
+
+	return processed, nil
+}
+
+// resolveUntilStable templates the values files again, using the previous pass as context, until
+// the result stops changing.
+//
+// The first pass cannot see the keys of the file being templated, so it renders them as
+// "<no value>". Each further pass resolves one more level of references between keys of the same
+// file: with a: "{{ .Values.b }}", b: "{{ .Values.c }}" and c: x, a single extra pass still reads
+// the broken first-pass value of b.
+func (in *Input) resolveUntilStable(vals, firstPass map[string]any) (map[string]any, error) {
+	previous := firstPass
+
+	for range maxTemplatePasses - 1 {
+		passContext, err := utils.DeepCopy(vals)
+		if err != nil {
+			return nil, fmt.Errorf("error copying initial values: %w", err)
+		}
+
+		// merge the previous pass over the initial values to ensure they are not lost
+		err = values.MergeYamlMaps(passContext, previous)
 		if err != nil {
 			return nil, fmt.Errorf("error merging initial values: %w", err)
 		}
 
-		return in.compoundValues(vals)
+		current, err := in.compoundValues(passContext)
+		if err != nil {
+			return nil, err
+		}
+
+		if reflect.DeepEqual(current, previous) {
+			return current, in.checkResolved(current)
+		}
+
+		previous = current
 	}
 
-	return processed, nil
+	return nil, fmt.Errorf("%w after %d passes", dryerr.ErrValuesNotConverged, maxTemplatePasses)
+}
+
+// checkResolved fails when a templated value still holds the "<no value>" placeholder, which
+// would otherwise reach the rendered manifests silently. IgnoreEmpty opts into such values.
+func (in *Input) checkResolved(vals map[string]any) error {
+	if in.Settings.IgnoreEmpty {
+		return nil
+	}
+
+	unresolved := unresolvedPaths(vals, "")
+	if len(unresolved) == 0 {
+		return nil
+	}
+
+	slices.Sort(unresolved)
+
+	return fmt.Errorf("%w: %s", dryerr.ErrUnresolvedValue, strings.Join(unresolved, ", "))
+}
+
+// unresolvedPaths returns the dotted paths of the values that contain the "<no value>" placeholder.
+func unresolvedPaths(node any, path string) []string {
+	var paths []string
+
+	switch val := node.(type) {
+	case map[string]any:
+		for key, child := range val {
+			paths = append(paths, unresolvedPaths(child, joinPath(path, key))...)
+		}
+	case []any:
+		for i, child := range val {
+			paths = append(paths, unresolvedPaths(child, joinPath(path, strconv.Itoa(i)))...)
+		}
+	case string:
+		if strings.Contains(val, unresolvedPlaceholder) {
+			paths = append(paths, path)
+		}
+	}
+
+	return paths
+}
+
+func joinPath(path, key string) string {
+	if path == "" {
+		return key
+	}
+
+	return path + "." + key
 }
 
 // processValuesFiles goes through all values files and returns templated data and default values.

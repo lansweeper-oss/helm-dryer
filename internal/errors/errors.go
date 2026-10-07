@@ -10,4 +10,6 @@ var (
 	ErrOutsideRepoRoot          = errors.New("path resolves outside the repository root")
 	ErrUnexpectedReleaseType    = errors.New("unexpected release type")
 	ErrUnexpectedType           = errors.New("expected a map for key")
+	ErrUnresolvedValue          = errors.New("unresolved template value")
+	ErrValuesNotConverged       = errors.New("templated values did not converge")
 )

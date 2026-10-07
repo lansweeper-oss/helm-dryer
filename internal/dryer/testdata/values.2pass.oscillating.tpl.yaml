@@ -1,0 +1,2 @@
+# Self-reference whose value flips on every pass, so it never settles.
+toggle: '{{ if eq (toString .Values.toggle) "on" }}off{{ else }}on{{ end }}'

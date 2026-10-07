@@ -702,21 +702,39 @@ yet. With two-pass, Pass 1 merges all files so `admins` contains `a-team`, and P
 
 #### How it works
 
-When `twoPass` is enabled, the plugin renders the values files twice:
+When `twoPass` is enabled, the plugin renders the values files at least twice:
 
 1. **Pass 1**: Render values files using the injected `valuesObject` as `.Values` with
    `missingkey=default` (missing references resolve to empty instead of erroring). This produces
    a partially or fully resolved set of values.
-2. **Pass 2**: Merge the Pass 1 output back with the original `valuesObject`, then render the
-   values files again using this merged result as `.Values` with `missingkey=error`.
+2. **Pass 2 and later**: Merge the previous pass output back with the original `valuesObject`,
+   then render the values files again using this merged result as `.Values` with
+   `missingkey=error`. Repeat until the output stops changing.
 
 ```mermaid
 graph LR
   A[valuesObject] --> |".Values"| B["Pass 1 (missingkey=default)"]
   B --> C[Resolved Values]
-  C --> |merge with valuesObject| D["Pass 2 (missingkey=error)"]
-  D --> E[Final Values]
+  C --> |merge with valuesObject| D["Pass N (missingkey=error)"]
+  D --> |changed| C
+  D --> |unchanged| E[Final Values]
 ```
+
+Pass 1 cannot see the keys of the file being rendered, so it renders them as `<no value>`. Each
+further pass resolves one more level of references between keys of the same file, which is why a
+chain such as the following needs more than two passes:
+
+```yaml
+publicDomain: example.com
+linkExpiredUrl: "https://eu.{{ .Values.publicDomain }}/link-expired"
+emailLink: "{{ .Values.linkExpiredUrl }}"  # still https://eu.<no value>/link-expired after Pass 2
+```
+
+The render fails instead of producing silently wrong values when:
+
+- the output keeps changing after 10 passes (e.g. a value that depends on itself);
+- a value still contains `<no value>` once the output is stable (e.g. `index` on a missing map key),
+  unless `ignoreEmpty` is enabled.
 
 #### Umbrella charts
 

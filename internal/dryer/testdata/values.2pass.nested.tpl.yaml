@@ -1,0 +1,7 @@
+# Same-file references nested several levels deep; `continent` comes from --set.
+publicDomain: example.com
+linkExpiredUrl: "https://{{ .Values.continent }}.{{ .Values.publicDomain }}/link-expired"
+api:
+  oneLevel: "https://{{ .Values.continent }}.{{ .Values.publicDomain }}/link-expired"
+  twoLevels: "{{ .Values.linkExpiredUrl }}"
+  threeLevels: "{{ .Values.api.twoLevels }}?expired=true"

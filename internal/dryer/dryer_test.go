@@ -228,6 +228,71 @@ func Test2PassTemplateValues(t *testing.T) {
 	assert.Equal(t, expected, out, "The rendered values are different from the expected ones")
 }
 
+func TestTwoPassResolvesNestedSameFileReferences(t *testing.T) {
+	t.Parallel()
+
+	for _, onTheFly := range []bool{false, true} {
+		t.Run(fmt.Sprintf("onTheFly=%t", onTheFly), func(t *testing.T) {
+			t.Parallel()
+
+			test := setupTest(t, []string{"values.2pass.nested.tpl.yaml"})
+			test.Data.Set["continent"] = "eu"
+			test.Settings.TwoPass = true
+			test.Settings.OnTheFly = onTheFly
+
+			err := test.TemplateValues(context.Background())
+			require.NoError(t, err, "TemplateValues should not return an error")
+
+			out, err := utils.ParseYAMLFile(test.Settings.Out)
+			require.NoError(t, err, "The output values should be a valid YAML")
+
+			api, ok := out["api"].(map[string]any)
+			require.True(t, ok, "api should be a map")
+
+			const url = "https://eu.example.com/link-expired"
+
+			assert.Equal(t, url, out["linkExpiredUrl"])
+			assert.Equal(t, url, api["oneLevel"])
+			assert.Equal(t, url, api["twoLevels"], "a reference to a templated key of the same file must resolve")
+			assert.Equal(t, url+"?expired=true", api["threeLevels"], "longer same-file chains must resolve")
+		})
+	}
+}
+
+func TestTwoPassFailsWhenValuesDoNotConverge(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, []string{"values.2pass.oscillating.tpl.yaml"})
+	test.Settings.TwoPass = true
+
+	err := test.TemplateValues(context.Background())
+	require.ErrorIs(t, err, dryerr.ErrValuesNotConverged)
+}
+
+func TestTwoPassFailsOnUnresolvedValue(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, []string{"values.2pass.novalue.tpl.yaml"})
+	test.Data.Set["settings.enabled"] = "true"
+	test.Settings.TwoPass = true
+
+	err := test.TemplateValues(context.Background())
+	require.ErrorIs(t, err, dryerr.ErrUnresolvedValue)
+	assert.ErrorContains(t, err, "flag", "the error should name the unresolved key")
+}
+
+func TestTwoPassWithIgnoreEmptyKeepsUnresolvedValue(t *testing.T) {
+	t.Parallel()
+
+	test := setupTest(t, []string{"values.2pass.novalue.tpl.yaml"})
+	test.Data.Set["settings.enabled"] = "true"
+	test.Settings.TwoPass = true
+	test.Settings.IgnoreEmpty = true
+
+	err := test.TemplateValues(context.Background())
+	require.NoError(t, err, "IgnoreEmpty opts into empty values, so <no value> is accepted")
+}
+
 func TestTemplateChart(t *testing.T) {
 	t.Parallel()
 
