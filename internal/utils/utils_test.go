@@ -608,8 +608,10 @@ func TestGetTemplate(t *testing.T) {
 
 		tpl := utils.GetTemplate("missingkey=error", "{{", "}}")
 
-		_, err := tpl.Parse(`{{ env "HOME" }}`)
-		require.Error(t, err, "env function should not be available")
+		for _, fn := range []string{"env", "expandenv", "expandEnv"} {
+			_, err := tpl.Parse(`{{ ` + fn + ` "HOME" }}`)
+			require.Error(t, err, "%s function should not be available", fn)
+		}
 	})
 
 	t.Run("sprig functions are available", func(t *testing.T) {
@@ -625,6 +627,22 @@ func TestGetTemplate(t *testing.T) {
 		err = parsed.Execute(&buf, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "HELLO", buf.String())
+	})
+
+	t.Run("sprig signatures and sprout names are available", func(t *testing.T) {
+		t.Parallel()
+
+		tpl := utils.GetTemplate("missingkey=error", "{{", "}}")
+
+		parsed, err := tpl.Parse(`{{ "hi" | b64enc }},{{ "hi" | base64Encode }} {{ "hi" | toUpper }} ` +
+			`{{ get .m "k" }} {{ hasKey .m "k" }} {{ .m | dig "k" "x" }}`)
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		err = parsed.Execute(&buf, map[string]any{"m": map[string]any{"k": "v"}})
+		require.NoError(t, err)
+		assert.Equal(t, "aGk=,aGk= HI v true v", buf.String())
 	})
 }
 

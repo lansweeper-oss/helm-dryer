@@ -13,7 +13,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Masterminds/sprig/v3"
+	"github.com/go-sprout/sprout/sprigin"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -23,7 +23,8 @@ const (
 	ReadWriteDir = 0o750
 )
 
-// templateFuncs is the cached Sprig function map with env/expandenv removed.
+// templateFuncs is the cached Sprout function map (sprigin: Sprig-compatible names and
+// signatures plus Sprout's native names) with env/expandenv removed.
 // Computed once to avoid re-allocating the large map (~100+ entries) on every template call.
 //
 //nolint:gochecknoglobals
@@ -31,9 +32,10 @@ var templateFuncs template.FuncMap
 
 //nolint:gochecknoinits
 func init() {
-	templateFuncs = sprig.FuncMap()
+	templateFuncs = sprigin.FuncMap()
 	delete(templateFuncs, "env")
 	delete(templateFuncs, "expandenv")
+	delete(templateFuncs, "expandEnv")
 	templateFuncs["toYaml"] = toYAML
 	templateFuncs["fromYaml"] = fromYAML
 }
@@ -135,7 +137,7 @@ func GetEnv(key, fallback string) string {
 	return fallback
 }
 
-// GetTemplate returns a new template with Sprig functions, excluding env and expandenv.
+// GetTemplate returns a new template with Sprig-compatible Sprout functions, excluding env and expandenv.
 // This is to prevent information leakage (injected tokens/passwords).
 // Both Helm and ArgoCD remove these due to security implications.
 // See: https://masterminds.github.io/sprig/os.html
