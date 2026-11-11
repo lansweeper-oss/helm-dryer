@@ -19,7 +19,7 @@ import (
 	"github.com/lansweeper-oss/helm-dryer/internal/repocreds"
 	"github.com/lansweeper-oss/helm-dryer/internal/utils"
 	"github.com/lansweeper-oss/helm-dryer/internal/values"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type Input struct {
