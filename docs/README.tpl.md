@@ -242,8 +242,8 @@ go run . get -f tests/values.tpl.yaml --initial-values common.yaml --initial-val
 > Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.
 > Additionally, `fromYaml` and `toYaml` functions are available.
 >
-> At the moment, you can reuse a value already defined **if** the [two-pass](#two-pass-rendering) experimental feature is enabled,
-> e.g. the following is supported:
+> At the moment, you can reuse a value already defined **if** the [two-pass](#two-pass-rendering)
+> experimental feature is enabled, e.g. the following is supported:
 
 ```yaml
 foo: bar

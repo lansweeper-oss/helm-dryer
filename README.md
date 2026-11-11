@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT: This file is auto-generated from README.tpl.md by generate-readme.sh. -->
 
-# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-75%25-orange) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+# helm-dryer ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE_INT}%25-${COVERAGE_COLOR}) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 An ArgoCD Config Management Plugin to compose value injection for Helm charts, by keeping the values
 files really DRY.
@@ -321,8 +321,8 @@ go run . get -f tests/values.tpl.yaml --initial-values common.yaml --initial-val
 > Please note that out of the box, go template and [Sprig][] are supported as in a regular Helm template.
 > Additionally, `fromYaml` and `toYaml` functions are available.
 >
-> At the moment, you can reuse a value already defined **if** the [two-pass](#two-pass-rendering) experimental feature is enabled,
-> e.g. the following is supported:
+> At the moment, you can reuse a value already defined **if** the [two-pass](#two-pass-rendering)
+> experimental feature is enabled, e.g. the following is supported:
 
 ```yaml
 foo: bar
